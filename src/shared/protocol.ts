@@ -24,12 +24,16 @@ export type ClientRequest =
   | { type: "list" }
   | { type: "open"; directory: string }
   | { type: "validate"; directory: string; file: string }
-  | { type: "validate-public"; directory: string };
+  | { type: "validate-public"; directory: string }
+  | { type: "read-material"; directory: string; material: string }
+  | { type: "list-examples"; directory: string };
 
 export type ServerMessage =
   | { type: "status"; git_available: boolean; node_available: boolean; cliAvailable: boolean; message?: string }
   | { type: "courses"; entries: LocalCheckout[] }
   | { type: "validation"; result: LocalDiagnostic }
+  | { type: "material"; name: string; content: string }
+  | { type: "examples"; directory: string; names: string[] }
   | { type: "error"; message: string };
 
 export function isClientRequest(value: unknown): value is ClientRequest {
@@ -38,6 +42,11 @@ export function isClientRequest(value: unknown): value is ClientRequest {
   if (input.type === "doctor" || input.type === "list") return true;
   if (input.type === "open") return typeof input.directory === "string" && input.directory.length > 0;
   if (input.type === "validate-public") return typeof input.directory === "string" && input.directory.length > 0;
+  if (input.type === "list-examples") return typeof input.directory === "string" && input.directory.length > 0;
+  if (input.type === "read-material") {
+    return typeof input.directory === "string" && input.directory.length > 0 &&
+      typeof input.material === "string" && input.material.length > 0;
+  }
   if (input.type === "validate") {
     return typeof input.directory === "string" && input.directory.length > 0 &&
       typeof input.file === "string" && input.file.length > 0;

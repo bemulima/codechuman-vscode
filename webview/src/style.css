@@ -24,6 +24,10 @@ h3 { margin: 0 0 10px; font-size: 13px; }
 .lesson { padding: 10px 0; border-top: 1px solid var(--vscode-panel-border); }
 .lesson-info { display: flex; flex-direction: column; gap: 2px; margin-bottom: 9px; }
 .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.study-actions { display: flex; gap: 3px; flex-wrap: wrap; margin-top: 8px; }
+.material { border: 1px solid var(--vscode-panel-border); border-radius: 8px; padding: 10px; margin-top: 10px; }
+.material pre { max-height: 420px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.example-link { display: block; text-align: left; width: 100%; margin-bottom: 5px; color: var(--vscode-textLink-foreground); background: transparent; border: 1px solid var(--vscode-panel-border); }
 .notice { color: var(--vscode-foreground); background: var(--vscode-editor-inactiveSelectionBackground, #30363d); border: 1px solid var(--vscode-panel-border); padding: 10px; border-radius: 7px; margin: 10px 0; font-size: 12px; line-height: 1.5; }
 .diagnostic { border: 1px solid var(--vscode-panel-border); border-radius: 8px; padding: 10px; margin-top: 12px; }
 .diagnostic.pass { border-color: #4cbf8a; }

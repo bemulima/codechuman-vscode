@@ -13,6 +13,8 @@ export function App() {
   const [cliReady, setCliReady] = useState<boolean | null>(null);
   const [gitReady, setGitReady] = useState(false);
   const [diagnostic, setDiagnostic] = useState<LocalDiagnostic | null>(null);
+  const [material, setMaterial] = useState<{ name: string; content: string } | null>(null);
+  const [examples, setExamples] = useState<{ directory: string; names: string[] } | null>(null);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -26,6 +28,11 @@ export function App() {
         setEntries(payload.entries);
       } else if (payload.type === "validation") {
         setDiagnostic(payload.result);
+      } else if (payload.type === "material") {
+        setMaterial({ name: payload.name, content: payload.content });
+      } else if (payload.type === "examples") {
+        setExamples({ directory: payload.directory, names: payload.names });
+        setMaterial(null);
       } else if (payload.type === "error") {
         setMessage(payload.message);
       }
@@ -73,10 +80,34 @@ export function App() {
                     <button className="secondary" onClick={() => vscode.postMessage({ type: "validate", directory: entry.directory, file: "app.js" })}>Проверить JS</button>
                     <button className="secondary" onClick={() => vscode.postMessage({ type: "validate-public", directory: entry.directory })}>Публичные тесты</button>
                   </div>
+                  <div className="study-actions">
+                    <button className="subtle" onClick={() => vscode.postMessage({ type: "read-material", directory: entry.directory, material: "lesson.md" })}>Урок</button>
+                    <button className="subtle" onClick={() => vscode.postMessage({ type: "read-material", directory: entry.directory, material: "task.md" })}>Задание</button>
+                    <button className="subtle" onClick={() => vscode.postMessage({ type: "read-material", directory: entry.directory, material: "quiz.json" })}>Тест</button>
+                    <button className="subtle" onClick={() => vscode.postMessage({ type: "list-examples", directory: entry.directory })}>Примеры</button>
+                  </div>
                 </div>
               ))}
             </div>
           ))}
+          {examples && (
+            <div className="material">
+              <h3>Локальные примеры</h3>
+              {examples.names.length === 0 && <p className="muted">Для этого урока нет сохранённых примеров.</p>}
+              {examples.names.map((name) => (
+                <button className="example-link" key={name} onClick={() =>
+                  vscode.postMessage({ type: "read-material", directory: examples.directory, material: name })
+                }>{name}</button>
+              ))}
+            </div>
+          )}
+          {material && <div className="material">
+            <div className="section-title">
+              <h3>{material.name}</h3>
+              <button className="subtle" onClick={() => setMaterial(null)}>Закрыть</button>
+            </div>
+            <pre>{material.content}</pre>
+          </div>}
           {diagnostic && <div className={`diagnostic ${diagnostic.status.toLowerCase()}`}>
             <strong>Локальная проверка: {diagnostic.status}</strong>
             {diagnostic.details && <pre>{diagnostic.details}</pre>}

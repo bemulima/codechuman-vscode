@@ -8,6 +8,9 @@ Early, **partial** implementation of [Codechuman IDE #28](https://github.com/bem
 - A configurable CLI path and workspace root (`~/.codechuman` by default).
 - Local checkout listing via `codechuman list --root <path>`.
 - Opening an already downloaded task in VS Code.
+- Reading cached lesson, task, example files and quiz JSON in the sidebar.
+  Files are path-allowlisted, size-bounded and cannot follow symlinks outside
+  the local learning cache. Quiz display is read-only, not a scored quiz yet.
 - Deterministic JavaScript syntax checks via `codechuman validate-js` and
   explicitly requested public tests via `codechuman validate-public-js`.
 - Safe message routing: the webview cannot execute arbitrary shell commands.

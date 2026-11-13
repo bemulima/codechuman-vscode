@@ -6,6 +6,7 @@ import * as path from "node:path";
 import * as crypto from "node:crypto";
 import type { ClientRequest, LocalCheckout, LocalDiagnostic, ServerMessage } from "./shared/protocol";
 import { isClientRequest } from "./shared/protocol";
+import { listLocalExamples, readLessonMaterial } from "./shared/materials";
 
 function localRoot(): string {
   const setting = vscode.workspace.getConfiguration("codechuman").get<string>("workspaceRoot", "~/.codechuman");
@@ -120,6 +121,17 @@ class SidebarProvider implements vscode.WebviewViewProvider {
           const directory = checkedDirectory(message.directory);
           const result = await cli(["validate-public-js", "--workspace", directory]) as LocalDiagnostic;
           this.send({ type: "validation", result });
+          break;
+        }
+        case "read-material": {
+          const directory = checkedDirectory(message.directory);
+          this.send({ type: "material", name: message.material,
+            content: readLessonMaterial(directory, message.material) });
+          break;
+        }
+        case "list-examples": {
+          const directory = checkedDirectory(message.directory);
+          this.send({ type: "examples", directory, names: listLocalExamples(directory) });
           break;
         }
       }
