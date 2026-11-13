@@ -7,6 +7,11 @@ button.secondary { color: var(--vscode-foreground); border-color: var(--vscode-p
 button.subtle { color: var(--vscode-descriptionForeground); background: transparent; padding: 4px 6px; }
 .app { padding: 0 12px; min-height: 100vh; }
 header { display: flex; justify-content: space-between; align-items: center; padding: 18px 0 12px; }
+.account { border: 1px solid var(--vscode-panel-border); border-radius: 9px; padding: 9px; margin-bottom: 14px; font-size: 12px; }
+.account .section-title { margin-bottom: 8px; gap: 7px; }
+.account p { margin: 6px 0; font-size: 11px; }
+.account .actions { margin: 8px 0; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
 .brand { display: flex; align-items: center; gap: 9px; font-size: 15px; }
 .brand-icon { color: #4cbf8a; font-family: monospace; font-weight: 900; font-size: 16px; }
 .pill { border-radius: 20px; padding: 3px 8px; font-size: 10px; border: 1px solid var(--vscode-panel-border); color: var(--vscode-descriptionForeground); }

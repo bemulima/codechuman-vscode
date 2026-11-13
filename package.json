@@ -15,7 +15,10 @@
   "contributes": {
     "commands": [
       { "command": "codechuman.open", "title": "Codechuman: Open" },
-      { "command": "codechuman.refresh", "title": "Codechuman: Refresh Local Courses" }
+      { "command": "codechuman.refresh", "title": "Codechuman: Refresh Local Courses" },
+      { "command": "codechuman.signIn", "title": "Codechuman: Sign In" },
+      { "command": "codechuman.signOut", "title": "Codechuman: Sign Out" },
+      { "command": "codechuman.checkoutRemote", "title": "Codechuman: Checkout TaskInstance (Preview)" }
     ],
     "viewsContainers": {
       "activitybar": [
@@ -33,11 +36,19 @@
         "codechuman.cliPath": {
           "type": "string",
           "default": "codechuman",
+          "scope": "application",
           "description": "Path to the installed Codechuman CLI executable."
+        },
+        "codechuman.apiBaseUrl": {
+          "type": "string",
+          "default": "",
+          "scope": "application",
+          "description": "HTTPS origin of the Codechuman student Gateway, without a path."
         },
         "codechuman.workspaceRoot": {
           "type": "string",
           "default": "~/.codechuman",
+          "scope": "application",
           "description": "Local course directory. Changes are never overwritten by an extension update."
         }
       }

@@ -12,6 +12,8 @@ export function App() {
   const [entries, setEntries] = useState<LocalCheckout[]>([]);
   const [cliReady, setCliReady] = useState<boolean | null>(null);
   const [gitReady, setGitReady] = useState(false);
+  const [authConfigured, setAuthConfigured] = useState(false);
+  const [authenticated, setAuthenticated] = useState(false);
   const [diagnostic, setDiagnostic] = useState<LocalDiagnostic | null>(null);
   const [material, setMaterial] = useState<{ name: string; content: string } | null>(null);
   const [examples, setExamples] = useState<{ directory: string; names: string[] } | null>(null);
@@ -24,6 +26,9 @@ export function App() {
         setCliReady(payload.cliAvailable);
         setGitReady(payload.git_available);
         if (payload.message) setMessage(payload.message);
+      } else if (payload.type === "auth") {
+        setAuthConfigured(payload.configured);
+        setAuthenticated(payload.connected);
       } else if (payload.type === "courses") {
         setEntries(payload.entries);
       } else if (payload.type === "validation") {
@@ -40,6 +45,7 @@ export function App() {
     window.addEventListener("message", handler);
     vscode.postMessage({ type: "doctor" });
     vscode.postMessage({ type: "list" });
+    vscode.postMessage({ type: "auth-status" });
     return () => window.removeEventListener("message", handler);
   }, []);
 
@@ -54,6 +60,23 @@ export function App() {
         <div className="brand"><span className="brand-icon">{"</>"}</span><strong>Codechuman</strong></div>
         <span className={cliReady && gitReady ? "pill ready" : "pill"}>{cliReady ? "Local" : "Setup"}</span>
       </header>
+      <div className="account">
+        <div className="section-title"><strong>Аккаунт Codechuman</strong>
+          <small>{authenticated ? "Подключён" : authConfigured ? "Не подключён" : "Не настроен"}</small>
+        </div>
+        {!authConfigured && <p className="muted">Настрой HTTPS адрес в параметре <code>codechuman.apiBaseUrl</code>.</p>}
+        <div className="actions">
+          {authenticated ? (
+            <>
+              <button onClick={() => vscode.postMessage({ type: "checkout-remote" })}>Скачать TaskInstance (preview)</button>
+              <button className="secondary" onClick={() => vscode.postMessage({ type: "sign-out" })}>Выйти</button>
+            </>
+          ) : (
+            <button disabled={!authConfigured} onClick={() => vscode.postMessage({ type: "sign-in" })}>Войти</button>
+          )}
+        </div>
+        {authenticated && <small>Скачивание требует ещё не опубликованный Git HTTPS endpoint сервера.</small>}
+      </div>
       <nav>
         <button className={tab === "courses" ? "selected" : ""} onClick={() => setTab("courses")}>Курсы</button>
         <button className={tab === "teacher" ? "selected" : ""} onClick={() => setTab("teacher")}>AI Teacher</button>

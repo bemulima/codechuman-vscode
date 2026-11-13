@@ -19,5 +19,9 @@ describe("Codechuman webview protocol", () => {
     expect(isClientRequest({ type: "validate-public", directory: "/tmp/js/01" })).toBe(true);
     expect(isClientRequest({ type: "read-material", directory: "/tmp/js/01", material: "lesson.md" })).toBe(true);
     expect(isClientRequest({ type: "list-examples", directory: "/tmp/js/01" })).toBe(true);
+    expect(isClientRequest({ type: "auth-status" })).toBe(true);
+    expect(isClientRequest({ type: "sign-in" })).toBe(true);
+    expect(isClientRequest({ type: "sign-out" })).toBe(true);
+    expect(isClientRequest({ type: "checkout-remote" })).toBe(true);
   });
 });
