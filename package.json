@@ -1,0 +1,69 @@
+{
+  "name": "codechuman-vscode",
+  "displayName": "Codechuman",
+  "description": "Learn programming with local practice, deterministic checks and the Codechuman platform.",
+  "version": "0.1.0",
+  "publisher": "bemulima",
+  "license": "UNLICENSED",
+  "repository": { "type": "git", "url": "https://github.com/bemulima/codechuman-vscode.git" },
+  "engines": {
+    "vscode": "^1.98.0"
+  },
+  "categories": ["Education", "Other"],
+  "main": "./dist/extension.js",
+  "activationEvents": ["onView:codechuman.sidebar", "onCommand:codechuman.open"],
+  "contributes": {
+    "commands": [
+      { "command": "codechuman.open", "title": "Codechuman: Open" },
+      { "command": "codechuman.refresh", "title": "Codechuman: Refresh Local Courses" }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        { "id": "codechuman", "title": "Codechuman", "icon": "assets/codechuman.svg" }
+      ]
+    },
+    "views": {
+      "codechuman": [
+        { "type": "webview", "id": "codechuman.sidebar", "name": "Learn" }
+      ]
+    },
+    "configuration": {
+      "title": "Codechuman",
+      "properties": {
+        "codechuman.cliPath": {
+          "type": "string",
+          "default": "codechuman",
+          "description": "Path to the installed Codechuman CLI executable."
+        },
+        "codechuman.workspaceRoot": {
+          "type": "string",
+          "default": "~/.codechuman",
+          "description": "Local course directory. Changes are never overwritten by an extension update."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --config vitest.config.ts",
+    "build:extension": "esbuild src/extension.ts --bundle --platform=node --format=cjs --target=node20 --external:vscode --outfile=dist/extension.js",
+    "build:webview": "vite build",
+    "build": "npm run typecheck && npm run build:extension && npm run build:webview",
+    "package:vsix": "npm run build && vsce package --no-dependencies"
+  },
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@types/vscode": "^1.98.0",
+    "@vscode/vsce": "^3.5.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.9.0",
+    "vite": "^7.0.0",
+    "vitest": "^3.2.0"
+  }
+}
