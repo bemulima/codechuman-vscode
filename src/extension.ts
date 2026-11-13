@@ -11,6 +11,8 @@ import { AuthSession } from "./shared/auth";
 import { SandboxHttpSync } from "./shared/sandbox";
 import { checkoutFileForSync } from "./shared/workspace";
 import { DebouncedSandboxQueue } from "./shared/auto-sync";
+import { localValidationLocations } from "./shared/diagnostics";
+import type { SandboxValidationObservation } from "./shared/sandbox";
 
 type SensitiveSetting = "apiBaseUrl" | "cliPath" | "workspaceRoot";
 
@@ -89,8 +91,13 @@ class SidebarProvider implements vscode.WebviewViewProvider {
   private readonly authSessions = new Map<string, AuthSession>();
   private readonly autoSyncTasks = new Map<string, DebouncedSandboxQueue>();
   private readonly acknowledgedFences = new Map<string, { origin: string; epoch: number }>();
+  private readonly diagnostics: vscode.DiagnosticCollection;
+  private readonly diagnosticURIs = new Map<string, vscode.Uri[]>();
 
-  constructor(private readonly context: vscode.ExtensionContext) {}
+  constructor(private readonly context: vscode.ExtensionContext) {
+    this.diagnostics = vscode.languages.createDiagnosticCollection("Codechuman Sandbox");
+    context.subscriptions.push(this.diagnostics);
+  }
 
   private get extensionUri(): vscode.Uri {
     return this.context.extensionUri;
@@ -149,6 +156,38 @@ class SidebarProvider implements vscode.WebviewViewProvider {
     this.reportAutoSyncState();
   }
 
+  private showSandboxValidation(
+    sandboxId: string, checkoutDirectory: string, revision: number,
+    observation?: SandboxValidationObservation,
+  ): void {
+    for (const uri of this.diagnosticURIs.get(sandboxId) ?? []) this.diagnostics.delete(uri);
+    this.diagnosticURIs.delete(sandboxId);
+    const grouped = new Map<string, vscode.Diagnostic[]>();
+    if (observation) {
+      for (const { filePath, issue } of localValidationLocations(checkoutDirectory, observation.errors)) {
+        const row = Math.max(0, issue.line - 1);
+        const col = Math.max(0, issue.column - 1);
+        const severity = issue.severity === "warning" ? vscode.DiagnosticSeverity.Warning
+          : issue.severity === "info" ? vscode.DiagnosticSeverity.Information : vscode.DiagnosticSeverity.Error;
+        const diagnostic = new vscode.Diagnostic(new vscode.Range(row, col, row, col + 1),
+          issue.hint ? `${issue.message}\n${issue.hint}` : issue.message, severity);
+        diagnostic.code = issue.code;
+        diagnostic.source = "Codechuman Sandbox";
+        const entries = grouped.get(filePath) ?? [];
+        entries.push(diagnostic);
+        grouped.set(filePath, entries);
+      }
+    }
+    const uris: vscode.Uri[] = [];
+    for (const [filePath, entries] of grouped) {
+      const uri = vscode.Uri.file(filePath);
+      this.diagnostics.set(uri, entries);
+      uris.push(uri);
+    }
+    this.diagnosticURIs.set(sandboxId, uris);
+    this.send({ type: "sandbox-validation", revision, observation: observation ?? null });
+  }
+
   onDocumentChanged(document: vscode.TextDocument): void {
     if (!this.autoSyncTasks.size || document.uri.scheme !== "file") return;
     try {
@@ -189,6 +228,8 @@ class SidebarProvider implements vscode.WebviewViewProvider {
         case "sign-out": {
           this.disableAutoSync();
           this.acknowledgedFences.clear();
+          this.diagnostics.clear();
+          this.diagnosticURIs.clear();
           if (apiBaseURL()) await this.auth().signOut();
           this.send({ type: "auth", configured: !!apiBaseURL(), connected: false });
           break;
@@ -237,6 +278,8 @@ class SidebarProvider implements vscode.WebviewViewProvider {
           }
           this.send({ type: "sync", revision: result.workspaceRevision,
             mode: result.mode, action: result.action });
+          this.showSandboxValidation(binding.sandboxId, binding.checkoutDirectory,
+            result.workspaceRevision, result.validation);
           void vscode.window.showInformationMessage(
             `Sandbox подтвердил ${binding.relativePath} (ревизия ${result.workspaceRevision}).` +
             (result.mode === "legacy" ? " Внимание: прежний режим Sandbox без CAS fence." : ""),
@@ -276,6 +319,8 @@ class SidebarProvider implements vscode.WebviewViewProvider {
             expectedFenceEpoch = ack.fenceEpoch;
             this.acknowledgedFences.set(binding.sandboxId, { origin, epoch: expectedFenceEpoch });
             this.send({ type: "sync", revision: ack.workspaceRevision, mode: ack.mode, action: ack.action });
+            this.showSandboxValidation(binding.sandboxId, binding.checkoutDirectory,
+              ack.workspaceRevision, ack.validation);
           }, (error) => {
             const detail = error instanceof Error ? error.message : "Ошибка Sandbox";
             this.send({ type: "error", message: `Автосинхронизация остановлена: ${detail}` });

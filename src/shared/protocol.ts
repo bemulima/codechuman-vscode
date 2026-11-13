@@ -40,6 +40,7 @@ export type ServerMessage =
   | { type: "status"; git_available: boolean; node_available: boolean; cliAvailable: boolean; message?: string }
   | { type: "auth"; configured: boolean; connected: boolean }
   | { type: "sync"; revision: number; mode: "fenced" | "legacy"; action: "created" | "updated" }
+  | { type: "sandbox-validation"; revision: number; observation: SandboxValidationObservation | null }
   | { type: "auto-sync"; enabled: boolean; activeTasks: number; halted: boolean }
   | { type: "courses"; entries: LocalCheckout[] }
   | { type: "validation"; result: LocalDiagnostic }
@@ -67,3 +68,5 @@ export function isClientRequest(value: unknown): value is ClientRequest {
   }
   return false;
 }
+import type { SandboxValidationObservation } from "./sandbox";
+

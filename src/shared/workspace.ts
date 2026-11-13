@@ -7,6 +7,7 @@ const UUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
 export interface CheckoutFileBinding {
   sandboxId: string;
   relativePath: string;
+  checkoutDirectory: string;
 }
 
 // Resolve the active editor file only from a cached CLI-created Git checkout.
@@ -37,5 +38,5 @@ export function checkoutFileForSync(rootInput: string, documentPath: string): Ch
       !UUID.test(manifest.sandbox_id)) {
     throw new Error("Некорректная привязка задания к Sandbox.");
   }
-  return { sandboxId: manifest.sandbox_id, relativePath: segments.slice(2).join("/") };
+  return { sandboxId: manifest.sandbox_id, relativePath: segments.slice(2).join("/"), checkoutDirectory: checkout };
 }

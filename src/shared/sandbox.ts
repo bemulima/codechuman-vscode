@@ -12,6 +12,22 @@ export interface SandboxSyncAck {
   fenceEpoch?: number;
   mode: "fenced" | "legacy";
   action: "created" | "updated";
+  validation?: SandboxValidationObservation;
+}
+
+export interface SandboxValidationIssue {
+  code: string;
+  message: string;
+  file: string;
+  line: number;
+  column: number;
+  severity: "error" | "warning" | "info";
+  hint?: string;
+}
+
+export interface SandboxValidationObservation {
+  valid: boolean;
+  errors: SandboxValidationIssue[];
 }
 
 const UUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
@@ -24,6 +40,36 @@ function safeRelativePath(p: string): boolean {
   const segments = p.split("/");
   return segments.every((part) => !!part && part !== ".." && !part.startsWith(".") &&
     !["node_modules", "vendor", "dist"].includes(part));
+}
+
+function validationForRevision(events: unknown[], revision: number): SandboxValidationObservation | undefined {
+  for (const event of events) {
+    if (!event || typeof event !== "object") continue;
+    const entry = event as Record<string, unknown>;
+    const payload = entry.payload as Record<string, unknown> | undefined;
+    if (entry.event !== "validation_result" || !payload || payload.workspaceRevision !== revision) continue;
+    if (typeof payload.valid !== "boolean") return undefined;
+    if (payload.errors != null && !Array.isArray(payload.errors)) return undefined;
+    const errors: SandboxValidationIssue[] = [];
+    for (const raw of (payload.errors ?? []).slice(0, 100) as unknown[]) {
+      if (!raw || typeof raw !== "object") continue;
+      const value = raw as Record<string, unknown>;
+      if (typeof value.file !== "string" || (value.file !== "" && !safeRelativePath(value.file)) ||
+          typeof value.message !== "string" || !value.message.trim()) continue;
+      const severity = String(value.severity ?? "error").toLowerCase();
+      errors.push({
+        code: typeof value.code === "string" ? value.code.slice(0, 80) : "VALIDATION",
+        message: value.message.slice(0, 1024),
+        file: value.file,
+        line: Number.isSafeInteger(value.line) && Number(value.line) >= 1 ? Math.min(Number(value.line), 1_000_000) : 1,
+        column: Number.isSafeInteger(value.column) && Number(value.column) >= 1 ? Math.min(Number(value.column), 1_000_000) : 1,
+        severity: severity === "warning" || severity === "info" ? severity : "error",
+        ...(typeof value.hint === "string" && value.hint.trim() ? { hint: value.hint.slice(0, 512) } : {}),
+      });
+    }
+    return { valid: payload.valid, errors };
+  }
+  return undefined;
 }
 
 function strictOrigin(input: string): string {
@@ -151,11 +197,13 @@ export class SandboxHttpSync {
     if (fenceEpoch !== undefined && (!Number.isSafeInteger(nextFence) || Number(nextFence) <= fenceEpoch)) {
       throw new Error("Sandbox не подтвердил продвижение fence. Проверь сохранение вручную.");
     }
+    const validation = Array.isArray(events) ? validationForRevision(events, Number(revision)) : undefined;
     return {
       workspaceRevision: Number(revision),
       ...(fenceEpoch === undefined ? {} : { fenceEpoch: Number(nextFence) }),
       mode: fenceEpoch === undefined ? "legacy" : "fenced",
       action: created ? "created" : "updated",
+      ...(validation ? { validation } : {}),
     };
   }
 }
