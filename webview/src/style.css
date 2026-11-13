@@ -1,0 +1,43 @@
+:root { font-family: var(--vscode-font-family, system-ui); color: var(--vscode-foreground); background: var(--vscode-sideBar-background, #16191c); }
+* { box-sizing: border-box; }
+body { margin: 0; }
+button { font: inherit; cursor: pointer; border: 1px solid transparent; border-radius: 7px; padding: 7px 9px; color: var(--vscode-button-foreground); background: var(--vscode-button-background); }
+button:hover { background: var(--vscode-button-hoverBackground); }
+button.secondary { color: var(--vscode-foreground); border-color: var(--vscode-panel-border); background: transparent; }
+button.subtle { color: var(--vscode-descriptionForeground); background: transparent; padding: 4px 6px; }
+.app { padding: 0 12px; min-height: 100vh; }
+header { display: flex; justify-content: space-between; align-items: center; padding: 18px 0 12px; }
+.account { border: 1px solid var(--vscode-panel-border); border-radius: 9px; padding: 9px; margin-bottom: 14px; font-size: 12px; }
+.account .section-title { margin-bottom: 8px; gap: 7px; }
+.account p { margin: 6px 0; font-size: 11px; }
+.account .actions { margin: 8px 0; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+.brand { display: flex; align-items: center; gap: 9px; font-size: 15px; }
+.brand-icon { color: #4cbf8a; font-family: monospace; font-weight: 900; font-size: 16px; }
+.pill { border-radius: 20px; padding: 3px 8px; font-size: 10px; border: 1px solid var(--vscode-panel-border); color: var(--vscode-descriptionForeground); }
+.pill.ready { color: #4cbf8a; border-color: #4cbf8a; }
+nav { display: flex; gap: 3px; border-bottom: 1px solid var(--vscode-panel-border); margin-bottom: 20px; }
+nav button { background: transparent; color: var(--vscode-descriptionForeground); border-radius: 0; padding: 8px 10px; }
+nav button:hover { background: var(--vscode-list-hoverBackground); }
+nav button.selected { color: var(--vscode-foreground); border-bottom: 2px solid #4cbf8a; }
+.section-title { display: flex; align-items: center; justify-content: space-between; }
+h2 { font-size: 13px; margin: 0 0 14px; }
+h3 { margin: 0 0 10px; font-size: 13px; }
+.muted, small, footer { color: var(--vscode-descriptionForeground); }
+.muted { line-height: 1.6; }
+.course { border: 1px solid var(--vscode-panel-border); border-radius: 9px; padding: 12px; margin: 12px 0; }
+.lesson { padding: 10px 0; border-top: 1px solid var(--vscode-panel-border); }
+.lesson-info { display: flex; flex-direction: column; gap: 2px; margin-bottom: 9px; }
+.actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.study-actions { display: flex; gap: 3px; flex-wrap: wrap; margin-top: 8px; }
+.material { border: 1px solid var(--vscode-panel-border); border-radius: 8px; padding: 10px; margin-top: 10px; }
+.material pre { max-height: 420px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.example-link { display: block; text-align: left; width: 100%; margin-bottom: 5px; color: var(--vscode-textLink-foreground); background: transparent; border: 1px solid var(--vscode-panel-border); }
+.notice { color: var(--vscode-foreground); background: var(--vscode-editor-inactiveSelectionBackground, #30363d); border: 1px solid var(--vscode-panel-border); padding: 10px; border-radius: 7px; margin: 10px 0; font-size: 12px; line-height: 1.5; }
+.diagnostic { border: 1px solid var(--vscode-panel-border); border-radius: 8px; padding: 10px; margin-top: 12px; }
+.diagnostic.pass { border-color: #4cbf8a; }
+.diagnostic.fail { border-color: #e57373; }
+pre { white-space: pre-wrap; font-size: 11px; }
+.teacher { text-align: center; padding-top: 36px; line-height: 1.6; }
+.teacher-symbol { font-size: 42px; color: #4cbf8a; }
+footer { font-size: 11px; line-height: 1.4; margin: 28px 0 16px; border-top: 1px solid var(--vscode-panel-border); padding-top: 12px; }
