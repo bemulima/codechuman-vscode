@@ -28,7 +28,9 @@ function cli(args: string[]): Promise<unknown> {
     const child = spawn(binary, args, { shell: false, windowsHide: true });
     let stdout = "";
     let stderr = "";
-    const timeout = setTimeout(() => child.kill(), 15000);
+    // Public CLI checks have their own 20s deadline; allow enough time for
+    // the child to report the real result before killing a stuck process.
+    const timeout = setTimeout(() => child.kill(), 30000);
     child.stdout.on("data", (chunk: Buffer) => {
       stdout += chunk.toString("utf8");
       if (stdout.length > 1024 * 1024) child.kill();
