@@ -10,6 +10,7 @@ import { listLocalExamples, readLessonMaterial } from "./shared/materials";
 import { AuthSession } from "./shared/auth";
 import { SandboxHttpSync } from "./shared/sandbox";
 import { checkoutFileForSync } from "./shared/workspace";
+import { DebouncedSandboxQueue } from "./shared/auto-sync";
 
 type SensitiveSetting = "apiBaseUrl" | "cliPath" | "workspaceRoot";
 
@@ -86,6 +87,8 @@ function cli(args: string[], options: { stdin?: string; timeoutMs?: number } = {
 class SidebarProvider implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
   private readonly authSessions = new Map<string, AuthSession>();
+  private readonly autoSyncTasks = new Map<string, DebouncedSandboxQueue>();
+  private readonly acknowledgedFences = new Map<string, { origin: string; epoch: number }>();
 
   constructor(private readonly context: vscode.ExtensionContext) {}
 
@@ -123,6 +126,7 @@ class SidebarProvider implements vscode.WebviewViewProvider {
     await this.handle({ type: "doctor" });
     await this.handle({ type: "list" });
     await this.handle({ type: "auth-status" });
+    await this.handle({ type: "auto-sync-status" });
   }
 
   run(message: ClientRequest): Promise<void> {
@@ -131,6 +135,28 @@ class SidebarProvider implements vscode.WebviewViewProvider {
 
   private send(message: ServerMessage): void {
     void this.view?.webview.postMessage(message);
+  }
+
+  private reportAutoSyncState(): void {
+    this.send({ type: "auto-sync", enabled: this.autoSyncTasks.size > 0,
+      activeTasks: this.autoSyncTasks.size,
+      halted: [...this.autoSyncTasks.values()].some((queue) => queue.isHalted) });
+  }
+
+  private disableAutoSync(): void {
+    for (const queue of this.autoSyncTasks.values()) queue.disable();
+    this.autoSyncTasks.clear();
+    this.reportAutoSyncState();
+  }
+
+  onDocumentChanged(document: vscode.TextDocument): void {
+    if (!this.autoSyncTasks.size || document.uri.scheme !== "file") return;
+    try {
+      const binding = checkoutFileForSync(localRoot(), document.uri.fsPath);
+      this.autoSyncTasks.get(binding.sandboxId)?.schedule(binding.relativePath, document.getText());
+    } catch {
+      // Ordinary documents outside an enabled, cached lesson do not sync.
+    }
   }
 
   private async handle(message: ClientRequest): Promise<void> {
@@ -161,6 +187,8 @@ class SidebarProvider implements vscode.WebviewViewProvider {
           break;
         }
         case "sign-out": {
+          this.disableAutoSync();
+          this.acknowledgedFences.clear();
           if (apiBaseURL()) await this.auth().signOut();
           this.send({ type: "auth", configured: !!apiBaseURL(), connected: false });
           break;
@@ -189,6 +217,9 @@ class SidebarProvider implements vscode.WebviewViewProvider {
             throw new Error("Открой исходный файл скачанного задания в редакторе VS Code.");
           }
           const binding = checkoutFileForSync(localRoot(), editor.document.uri.fsPath);
+          if (this.autoSyncTasks.has(binding.sandboxId)) {
+            throw new Error("Сначала выключи автосинхронизацию для ручной отправки этого задания.");
+          }
           const token = await this.auth().getAccessToken();
           if (!token) throw new Error("Сначала войди в аккаунт Codechuman.");
           // Explicit action: sends the editor's current buffer, including unsaved
@@ -199,12 +230,69 @@ class SidebarProvider implements vscode.WebviewViewProvider {
             content: editor.document.getText(),
             token,
           });
+          if (result.fenceEpoch !== undefined) {
+            this.acknowledgedFences.set(binding.sandboxId, { origin: apiBaseURL(), epoch: result.fenceEpoch });
+          } else {
+            this.acknowledgedFences.delete(binding.sandboxId);
+          }
           this.send({ type: "sync", revision: result.workspaceRevision,
             mode: result.mode, action: result.action });
           void vscode.window.showInformationMessage(
             `Sandbox подтвердил ${binding.relativePath} (ревизия ${result.workspaceRevision}).` +
             (result.mode === "legacy" ? " Внимание: прежний режим Sandbox без CAS fence." : ""),
           );
+          break;
+        }
+        case "auto-sync-status": {
+          this.reportAutoSyncState();
+          break;
+        }
+        case "auto-sync-enable": {
+          const editor = vscode.window.activeTextEditor;
+          if (!editor || editor.document.uri.scheme !== "file") {
+            throw new Error("Открой исходный файл урока для включения синхронизации.");
+          }
+          const binding = checkoutFileForSync(localRoot(), editor.document.uri.fsPath);
+          if (this.autoSyncTasks.has(binding.sandboxId)) {
+            throw new Error("Автосинхронизация этого задания уже включена. Для сброса конфликта сначала выключи её.");
+          }
+          const origin = apiBaseURL();
+          if (!origin || !(await this.auth().getAccessToken())) {
+            throw new Error("Для отправки изменений сначала войди в аккаунт Codechuman.");
+          }
+          const baseline = this.acknowledgedFences.get(binding.sandboxId);
+          if (!baseline || baseline.origin !== origin) {
+            throw new Error("Сначала выполни ручную синхронизацию файла: для авто-режима нужен подтверждённый atomic fence Sandbox.");
+          }
+          let expectedFenceEpoch = baseline.epoch;
+          const sandbox = new SandboxHttpSync(origin);
+          const queue = new DebouncedSandboxQueue(async (file, content) => {
+            if (apiBaseURL() !== origin) throw new Error("Адрес Gateway изменился: автосинхронизация остановлена.");
+            const token = await this.auth().getAccessToken();
+            if (!token) throw new Error("Сессия Codechuman завершена.");
+            const ack = await sandbox.syncFile({ sandboxId: binding.sandboxId,
+              relativePath: file, content, token }, { requireFence: true, expectedFenceEpoch });
+            if (ack.fenceEpoch === undefined) throw new Error("Sandbox не подтвердил atomic fence.");
+            expectedFenceEpoch = ack.fenceEpoch;
+            this.acknowledgedFences.set(binding.sandboxId, { origin, epoch: expectedFenceEpoch });
+            this.send({ type: "sync", revision: ack.workspaceRevision, mode: ack.mode, action: ack.action });
+          }, (error) => {
+            const detail = error instanceof Error ? error.message : "Ошибка Sandbox";
+            this.send({ type: "error", message: `Автосинхронизация остановлена: ${detail}` });
+            this.reportAutoSyncState();
+            void vscode.window.showWarningMessage(`Codechuman Auto Sync остановлен: ${detail}`);
+          });
+          queue.enable();
+          this.autoSyncTasks.set(binding.sandboxId, queue);
+          this.reportAutoSyncState();
+          void vscode.window.showInformationMessage(
+            "Автосинхронизация задания включена для следующих изменений (debounce 1 секунда, fenced ACK).",
+          );
+          break;
+        }
+        case "auto-sync-disable": {
+          this.disableAutoSync();
+          void vscode.window.showInformationMessage("Автосинхронизация Codechuman выключена.");
           break;
         }
         case "doctor": {
@@ -253,7 +341,9 @@ class SidebarProvider implements vscode.WebviewViewProvider {
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       this.send({ type: "error", message: detail });
-      if (!this.view || message.type === "sync-active") void vscode.window.showErrorMessage(detail);
+      if (!this.view || message.type === "sync-active" || message.type === "auto-sync-enable") {
+        void vscode.window.showErrorMessage(detail);
+      }
       if (message.type === "doctor") {
         this.send({ type: "status", cliAvailable: false, git_available: false, node_available: false,
           message: "Установи codechuman-cli из GitHub Releases и настрой путь в Codechuman Settings." });
@@ -294,6 +384,11 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(vscode.commands.registerCommand("codechuman.signOut", () => sidebar.run({ type: "sign-out" })));
   context.subscriptions.push(vscode.commands.registerCommand("codechuman.checkoutRemote", () => sidebar.run({ type: "checkout-remote" })));
   context.subscriptions.push(vscode.commands.registerCommand("codechuman.syncActive", () => sidebar.run({ type: "sync-active" })));
+  context.subscriptions.push(vscode.commands.registerCommand("codechuman.autoSyncEnable", () => sidebar.run({ type: "auto-sync-enable" })));
+  context.subscriptions.push(vscode.commands.registerCommand("codechuman.autoSyncDisable", () => sidebar.run({ type: "auto-sync-disable" })));
+  context.subscriptions.push(vscode.workspace.onDidChangeTextDocument((event) => {
+    if (event.contentChanges.length > 0) sidebar.onDocumentChanged(event.document);
+  }));
 }
 
 export function deactivate(): void {}

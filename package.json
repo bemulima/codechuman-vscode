@@ -19,7 +19,9 @@
       { "command": "codechuman.signIn", "title": "Codechuman: Sign In" },
       { "command": "codechuman.signOut", "title": "Codechuman: Sign Out" },
       { "command": "codechuman.checkoutRemote", "title": "Codechuman: Checkout TaskInstance (Preview)" },
-      { "command": "codechuman.syncActive", "title": "Codechuman: Sync Active File to Sandbox (Manual)" }
+      { "command": "codechuman.syncActive", "title": "Codechuman: Sync Active File to Sandbox (Manual)" },
+      { "command": "codechuman.autoSyncEnable", "title": "Codechuman: Enable Auto Sync for Active Task" },
+      { "command": "codechuman.autoSyncDisable", "title": "Codechuman: Disable All Auto Sync" }
     ],
     "viewsContainers": {
       "activitybar": [

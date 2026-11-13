@@ -55,6 +55,32 @@ describe("Codechuman Sandbox HTTP file sync", () => {
     expect(new Headers(requests[2].headers).get("X-Sandbox-Fence-Epoch")).toBeNull();
   });
 
+  it("refuses automatic writes without an atomic fence before touching a file", async () => {
+    const calls: string[] = [];
+    const request: typeof fetch = async (input) => {
+      calls.push(String(input));
+      return json(404, { error: "sandbox fence unavailable" });
+    };
+    await expect(new SandboxHttpSync("https://learn.example.org", request).syncFile({
+      sandboxId: ID, relativePath: "app.js", content: "changed", token: "valid.access.token",
+    }, { requireFence: true })).rejects.toThrow(/atomic|fence/i);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toContain("/workspace-fence");
+  });
+
+  it("rejects remote drift since the last acknowledged fence before sending a mutation", async () => {
+    const calls: string[] = [];
+    const request: typeof fetch = async (input) => {
+      calls.push(String(input));
+      return json(200, { schema: "sandbox-workspace-fence.v1", sandboxId: ID, fenceEpoch: 9 });
+    };
+    await expect(new SandboxHttpSync("https://learn.example.org", request).syncFile({
+      sandboxId: ID, relativePath: "app.js", content: "outdated", token: "valid.access.token",
+    }, { requireFence: true, expectedFenceEpoch: 8 })).rejects.toThrow(/изменил|конфликт|drift|устар/i);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toContain("/workspace-fence");
+  });
+
   it("rejects fence conflicts, redirects and missing acknowledgements instead of reporting success", async () => {
     const input = { sandboxId: ID, relativePath: "app.js", content: "new", token: "valid.access.token" };
     const conflict = [

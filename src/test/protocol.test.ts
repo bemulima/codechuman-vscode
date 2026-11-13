@@ -24,5 +24,8 @@ describe("Codechuman webview protocol", () => {
     expect(isClientRequest({ type: "sign-out" })).toBe(true);
     expect(isClientRequest({ type: "checkout-remote" })).toBe(true);
     expect(isClientRequest({ type: "sync-active" })).toBe(true);
+    expect(isClientRequest({ type: "auto-sync-enable" })).toBe(true);
+    expect(isClientRequest({ type: "auto-sync-disable" })).toBe(true);
+    expect(isClientRequest({ type: "auto-sync-status" })).toBe(true);
   });
 });

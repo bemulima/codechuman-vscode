@@ -27,6 +27,9 @@ export type ClientRequest =
   | { type: "sign-out" }
   | { type: "checkout-remote" }
   | { type: "sync-active" }
+  | { type: "auto-sync-enable" }
+  | { type: "auto-sync-disable" }
+  | { type: "auto-sync-status" }
   | { type: "open"; directory: string }
   | { type: "validate"; directory: string; file: string }
   | { type: "validate-public"; directory: string }
@@ -37,6 +40,7 @@ export type ServerMessage =
   | { type: "status"; git_available: boolean; node_available: boolean; cliAvailable: boolean; message?: string }
   | { type: "auth"; configured: boolean; connected: boolean }
   | { type: "sync"; revision: number; mode: "fenced" | "legacy"; action: "created" | "updated" }
+  | { type: "auto-sync"; enabled: boolean; activeTasks: number; halted: boolean }
   | { type: "courses"; entries: LocalCheckout[] }
   | { type: "validation"; result: LocalDiagnostic }
   | { type: "material"; name: string; content: string }
@@ -48,7 +52,8 @@ export function isClientRequest(value: unknown): value is ClientRequest {
   const input = value as Record<string, unknown>;
   if (input.type === "doctor" || input.type === "list" || input.type === "auth-status" ||
       input.type === "sign-in" || input.type === "sign-out" || input.type === "checkout-remote" ||
-      input.type === "sync-active") return true;
+      input.type === "sync-active" || input.type === "auto-sync-enable" || input.type === "auto-sync-disable" ||
+      input.type === "auto-sync-status") return true;
   if (input.type === "open") return typeof input.directory === "string" && input.directory.length > 0;
   if (input.type === "validate-public") return typeof input.directory === "string" && input.directory.length > 0;
   if (input.type === "list-examples") return typeof input.directory === "string" && input.directory.length > 0;
