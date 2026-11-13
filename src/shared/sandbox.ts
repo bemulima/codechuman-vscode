@@ -93,7 +93,7 @@ export class SandboxHttpSync {
     }
   }
 
-  async syncFile(input: SandboxSyncInput): Promise<SandboxSyncAck> {
+  async syncFile(input: SandboxSyncInput, options: { requireFence?: boolean; expectedFenceEpoch?: number } = {}): Promise<SandboxSyncAck> {
     const origin = strictOrigin(this.rawOrigin);
     if (!UUID.test(input.sandboxId)) throw new Error("Некорректный Sandbox ID.");
     if (!safeRelativePath(input.relativePath)) throw new Error("Запрещённый относительный путь Sandbox.");
@@ -107,6 +107,9 @@ export class SandboxHttpSync {
     const base = `${origin}/api/sandbox/v1/sandboxes/${input.sandboxId}`;
     const fence = await this.call("GET", `${base}/workspace-fence`, input.token);
     let fenceEpoch: number | undefined;
+    if (fence.status === 404 && options.requireFence) {
+      throw new Error("Atomic Sandbox fence недоступен: автоматическая синхронизация остановлена. Ручная отправка остаётся доступна.");
+    }
     if (fence.status !== 404) {
       const state = fence.data as Record<string, unknown> | undefined;
       if (!state || state.schema !== "sandbox-workspace-fence.v1" || state.sandboxId !== input.sandboxId ||
@@ -114,6 +117,13 @@ export class SandboxHttpSync {
         throw new Error("Некорректный fence Sandbox.");
       }
       fenceEpoch = Number(state.fenceEpoch);
+    }
+
+    if (options.expectedFenceEpoch !== undefined) {
+      if (!Number.isSafeInteger(options.expectedFenceEpoch) || options.expectedFenceEpoch < 0 ||
+          fenceEpoch !== options.expectedFenceEpoch) {
+        throw new Error("Сервер изменил Sandbox после последнего ACK: локальная версия устарела. Автосинхронизация остановлена.");
+      }
     }
 
     const existing = await this.call("GET", `${base}/files?path=${encodeURIComponent(input.relativePath)}`, input.token);

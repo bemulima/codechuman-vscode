@@ -27,14 +27,21 @@ Early, **partial** implementation of [Codechuman IDE #28](https://github.com/bem
   update its current text. It requires a server ACK with a workspace revision;
   when atomic workspace is enabled it also sends `Idempotency-Key` and the
   current `X-Sandbox-Fence-Epoch`, and rejects fence conflicts. No Git push.
+- Explicitly enabled **auto-sync** for a task. Every editor change is
+  debounced by one second, coalesced to its newest buffer and serialized per
+  Sandbox; only acknowledged revisions are reported. The mode requires an
+  initial **manual, fenced** sync and checks that the server's current fence
+  still equals the last acknowledged fence before every write. On drift,
+  conflict, offline failure or missing atomic fence, it halts and does not
+  blindly retry. Local unsent changes remain in the editor.
 - Security-sensitive settings (`apiBaseUrl`, `cliPath`, `workspaceRoot`) are
   **user-level settings only**; a cloned lesson's `.vscode/settings.json`
   cannot redirect credentials or override the executable.
 
 **Not yet implemented:** Browser/OAuth-only account pairing, Course/Student
 lesson selection, the *server-side* Sandbox Git HTTPS export (preview checkout
-currently receives HTTP 404 until deployed), **automatic/debounced** file sync,
-conflict-free legacy sync, teacher chat via
+currently receives HTTP 404 until deployed), cross-device reconciliation,
+conflict-free legacy auto-sync, teacher chat via
 Dialog/AI Prompt, official Practice Submit, and the complete acceptance suite.
 The teacher view explicitly labels missing integration instead of inventing
 AI responses. A student's account can sign in only when its existing Auth
@@ -80,10 +87,23 @@ packaging step adds a verified binary installer.
    student and the local manifest. The extension reports the server's confirmed
    workspace revision. If the server runs in legacy mode without atomic fencing,
    it warns that concurrent browser/IDE updates can overwrite each other.
+5. For tasks with **atomic Sandbox fencing enabled**, a successful manual
+   sync establishes the initial revision/fence baseline. Run **Codechuman:
+   Enable Auto Sync for Active Task**. Changes made *after enabling* are sent
+   after 1 second without Git commits or AI calls. Changes to several files
+   are sent serially; if the browser or another IDE updates the Sandbox, auto
+   sync stops before overwriting those changes. Use **Codechuman: Disable All
+   Auto Sync**, reconcile locally, and perform a new explicit manual sync
+   before enabling again. Signing out also disables all auto-sync queues.
 
-Manual sync does not mark a lesson complete, run the official validator, or
-invoke the AI Teacher. It has no dependence on AI credits. Automatic sync,
-revision reconciliation, and Teacher code-context reads are later slices.
+**Auto-sync intentionally does not run on legacy Sandbox workspaces** without
+an atomic fence. They still support manual sync (with an explicit concurrency
+warning). This restriction can be revisited only after a safe multi-writer
+contract and recovery behavior are available.
+
+Neither sync mode marks a lesson complete, runs the official validator, or
+invokes the AI Teacher. Neither depends on AI credits. Full multi-device
+reconciliation and Teacher code-context reads are later slices.
 
 The extension itself does not call third-party AI providers. The planned AI
 teacher continues through Codechuman's own AI Prompt/Dialog services, with

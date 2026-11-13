@@ -14,6 +14,8 @@ export function App() {
   const [gitReady, setGitReady] = useState(false);
   const [authConfigured, setAuthConfigured] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
+  const [autoSyncTasks, setAutoSyncTasks] = useState(0);
+  const [autoSyncHalted, setAutoSyncHalted] = useState(false);
   const [diagnostic, setDiagnostic] = useState<LocalDiagnostic | null>(null);
   const [material, setMaterial] = useState<{ name: string; content: string } | null>(null);
   const [examples, setExamples] = useState<{ directory: string; names: string[] } | null>(null);
@@ -32,6 +34,9 @@ export function App() {
       } else if (payload.type === "sync") {
         setMessage(`Sandbox подтвердил ${payload.action === "created" ? "создание" : "изменение"} файла, ревизия ${payload.revision}.` +
           (payload.mode === "legacy" ? " Legacy-режим: нет защиты от параллельной записи." : ""));
+      } else if (payload.type === "auto-sync") {
+        setAutoSyncTasks(payload.activeTasks);
+        setAutoSyncHalted(payload.halted);
       } else if (payload.type === "courses") {
         setEntries(payload.entries);
       } else if (payload.type === "validation") {
@@ -49,6 +54,7 @@ export function App() {
     vscode.postMessage({ type: "doctor" });
     vscode.postMessage({ type: "list" });
     vscode.postMessage({ type: "auth-status" });
+    vscode.postMessage({ type: "auto-sync-status" });
     return () => window.removeEventListener("message", handler);
   }, []);
 
@@ -73,6 +79,8 @@ export function App() {
             <>
               <button onClick={() => vscode.postMessage({ type: "checkout-remote" })}>Скачать TaskInstance (preview)</button>
               <button className="secondary" onClick={() => vscode.postMessage({ type: "sync-active" })}>Отправить текущий файл в Sandbox</button>
+              <button className="secondary" onClick={() => vscode.postMessage({ type: "auto-sync-enable" })}>Автосинхронизация: включить</button>
+              {autoSyncTasks > 0 && <button className="secondary" onClick={() => vscode.postMessage({ type: "auto-sync-disable" })}>Автосинхронизация: выключить</button>}
               <button className="secondary" onClick={() => vscode.postMessage({ type: "sign-out" })}>Выйти</button>
             </>
           ) : (
@@ -80,6 +88,7 @@ export function App() {
           )}
         </div>
         {authenticated && <small>Скачивание требует нового Git HTTPS endpoint. Отправка текущего файла использует существующий Sandbox REST; это ручная операция.</small>}
+        {authenticated && <small>Автосинхронизация включается отдельно для каждого открытого задания, отправляет изменения через 1 секунду и требует atomic fence. Активных заданий: {autoSyncTasks}.{autoSyncHalted ? " Конфликт: отправка остановлена." : ""}</small>}
       </div>
       <nav>
         <button className={tab === "courses" ? "selected" : ""} onClick={() => setTab("courses")}>Курсы</button>
