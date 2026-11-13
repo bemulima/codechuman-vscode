@@ -27,6 +27,7 @@ describe("Local workspace to Sandbox binding", () => {
     const { root, file, manifest } = sample();
     expect(checkoutFileForSync(root, file)).toEqual({
       relativePath: "src/app.js", sandboxId: manifest.sandbox_id,
+      checkoutDirectory: path.join(root, "js-beginner", "01"),
     });
   });
 

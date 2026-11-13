@@ -34,6 +34,12 @@ Early, **partial** implementation of [Codechuman IDE #28](https://github.com/bem
   still equals the last acknowledged fence before every write. On drift,
   conflict, offline failure or missing atomic fence, it halts and does not
   blindly retry. Local unsent changes remain in the editor.
+- **Sandbox validator diagnostics:** when an acknowledged Sandbox file update
+  includes a `validation_result` for that same `workspaceRevision`, the VS Code
+  sidebar shows the bounded error list. Existing local lesson files with safe
+  paths also receive VS Code **Problems** diagnostics at their reported
+  line/column. Stale validator events from another revision are ignored;
+  missing validation events are shown as **not run**, never as PASS.
 - Security-sensitive settings (`apiBaseUrl`, `cliPath`, `workspaceRoot`) are
   **user-level settings only**; a cloned lesson's `.vscode/settings.json`
   cannot redirect credentials or override the executable.
@@ -104,6 +110,10 @@ contract and recovery behavior are available.
 Neither sync mode marks a lesson complete, runs the official validator, or
 invokes the AI Teacher. Neither depends on AI credits. Full multi-device
 reconciliation and Teacher code-context reads are later slices.
+
+Sandbox may invoke its existing deterministic validation pipeline after a
+file mutation. Only such *already returned* validation events are displayed;
+this extension does not launch another AI or official Practice validation run.
 
 The extension itself does not call third-party AI providers. The planned AI
 teacher continues through Codechuman's own AI Prompt/Dialog services, with

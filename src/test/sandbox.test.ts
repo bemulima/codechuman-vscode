@@ -81,6 +81,43 @@ describe("Codechuman Sandbox HTTP file sync", () => {
     expect(calls[0]).toContain("/workspace-fence");
   });
 
+  it("returns bounded file/line diagnostics from the validator event matching the ACK revision", async () => {
+    const responses = [json(404, {}), json(200, { path: "src/app.js", content: "old" }), json(200, {
+      workspaceRevision: 5,
+      events: [
+        { event: "file_updated", payload: { path: "src/app.js", workspaceRevision: 5 } },
+        { event: "validation_result", payload: {
+          workspaceRevision: 5, valid: false, errors: [
+            { code: "JS_PARSE", message: "Unexpected token", file: "src/app.js", line: 3, column: 5, severity: "error" },
+            { code: "UNSAFE", message: "internal", file: "../secret.txt", line: 2, column: 1 },
+          ],
+        } },
+      ],
+    })];
+    const ack = await new SandboxHttpSync("https://learn.example.org", async () => responses.shift()!).syncFile({
+      sandboxId: ID, relativePath: "src/app.js", content: "bad", token: "valid.access.token",
+    });
+    expect(ack.validation).toEqual({ valid: false, errors: [
+      { code: "JS_PARSE", message: "Unexpected token", file: "src/app.js", line: 3, column: 5, severity: "error" },
+    ] });
+  });
+
+  it("ignores stale validator events from another revision without losing the confirmed file ACK", async () => {
+    const responses = [json(404, {}), json(200, { path: "app.js" }), json(200, {
+      workspaceRevision: 6, events: [
+        { event: "file_updated", payload: { path: "app.js", workspaceRevision: 6 } },
+        { event: "validation_result", payload: { workspaceRevision: 5, valid: false, errors: [
+          { code: "STALE", message: "old", file: "app.js", line: 1, column: 1 },
+        ] } },
+      ],
+    })];
+    const ack = await new SandboxHttpSync("https://learn.example.org", async () => responses.shift()!).syncFile({
+      sandboxId: ID, relativePath: "app.js", content: "new", token: "valid.access.token",
+    });
+    expect(ack.workspaceRevision).toBe(6);
+    expect(ack.validation).toBeUndefined();
+  });
+
   it("rejects fence conflicts, redirects and missing acknowledgements instead of reporting success", async () => {
     const input = { sandboxId: ID, relativePath: "app.js", content: "new", token: "valid.access.token" };
     const conflict = [

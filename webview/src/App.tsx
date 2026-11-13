@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ClientRequest, LocalCheckout, LocalDiagnostic, ServerMessage } from "../../src/shared/protocol";
+import type { SandboxValidationObservation } from "../../src/shared/sandbox";
 
 declare function acquireVsCodeApi(): { postMessage(message: ClientRequest): void };
 
@@ -17,6 +18,9 @@ export function App() {
   const [autoSyncTasks, setAutoSyncTasks] = useState(0);
   const [autoSyncHalted, setAutoSyncHalted] = useState(false);
   const [diagnostic, setDiagnostic] = useState<LocalDiagnostic | null>(null);
+  const [sandboxValidation, setSandboxValidation] = useState<{
+    revision: number; observation: SandboxValidationObservation | null;
+  } | null>(null);
   const [material, setMaterial] = useState<{ name: string; content: string } | null>(null);
   const [examples, setExamples] = useState<{ directory: string; names: string[] } | null>(null);
   const [message, setMessage] = useState("");
@@ -37,6 +41,8 @@ export function App() {
       } else if (payload.type === "auto-sync") {
         setAutoSyncTasks(payload.activeTasks);
         setAutoSyncHalted(payload.halted);
+      } else if (payload.type === "sandbox-validation") {
+        setSandboxValidation({ revision: payload.revision, observation: payload.observation });
       } else if (payload.type === "courses") {
         setEntries(payload.entries);
       } else if (payload.type === "validation") {
@@ -149,6 +155,21 @@ export function App() {
             {diagnostic.details && <pre>{diagnostic.details}</pre>}
             <small>Не является официальным результатом Practice Runtime.</small>
             <small>Публичные тесты запускают код на вашем компьютере; включайте только для доверенных заданий.</small>
+          </div>}
+          {sandboxValidation && <div className={`diagnostic ${sandboxValidation.observation?.valid ? "pass" : "fail"}`}>
+            <strong>Системная проверка Sandbox — ревизия {sandboxValidation.revision}</strong>
+            {!sandboxValidation.observation && <p>После записи сервер не прислал результат валидации. Это не означает PASS.</p>}
+            {sandboxValidation.observation && <>
+              <p>{sandboxValidation.observation.valid ? "Проверка прошла" : "Найдены ошибки"}</p>
+              {sandboxValidation.observation.errors.map((issue, index) => (
+                <p key={`${issue.file}:${issue.line}:${issue.code}:${index}`}>
+                  <code>{issue.file}:{issue.line}:{issue.column}</code> — {issue.message}
+                  {issue.hint && <small>Подсказка: {issue.hint}</small>}
+                </p>
+              ))}
+              <small>Ошибка также появится в VS Code Problems, если исходный файл существует в текущем уроке.</small>
+            </>}
+            <small>Системная проверка не расходует AI-кредиты и не является официальным Practice Submit.</small>
           </div>}
         </section>
       ) : (
