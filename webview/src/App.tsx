@@ -29,6 +29,9 @@ export function App() {
       } else if (payload.type === "auth") {
         setAuthConfigured(payload.configured);
         setAuthenticated(payload.connected);
+      } else if (payload.type === "sync") {
+        setMessage(`Sandbox подтвердил ${payload.action === "created" ? "создание" : "изменение"} файла, ревизия ${payload.revision}.` +
+          (payload.mode === "legacy" ? " Legacy-режим: нет защиты от параллельной записи." : ""));
       } else if (payload.type === "courses") {
         setEntries(payload.entries);
       } else if (payload.type === "validation") {
@@ -69,13 +72,14 @@ export function App() {
           {authenticated ? (
             <>
               <button onClick={() => vscode.postMessage({ type: "checkout-remote" })}>Скачать TaskInstance (preview)</button>
+              <button className="secondary" onClick={() => vscode.postMessage({ type: "sync-active" })}>Отправить текущий файл в Sandbox</button>
               <button className="secondary" onClick={() => vscode.postMessage({ type: "sign-out" })}>Выйти</button>
             </>
           ) : (
             <button disabled={!authConfigured} onClick={() => vscode.postMessage({ type: "sign-in" })}>Войти</button>
           )}
         </div>
-        {authenticated && <small>Скачивание требует ещё не опубликованный Git HTTPS endpoint сервера.</small>}
+        {authenticated && <small>Скачивание требует нового Git HTTPS endpoint. Отправка текущего файла использует существующий Sandbox REST; это ручная операция.</small>}
       </div>
       <nav>
         <button className={tab === "courses" ? "selected" : ""} onClick={() => setTab("courses")}>Курсы</button>

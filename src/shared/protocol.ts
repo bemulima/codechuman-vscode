@@ -26,6 +26,7 @@ export type ClientRequest =
   | { type: "sign-in" }
   | { type: "sign-out" }
   | { type: "checkout-remote" }
+  | { type: "sync-active" }
   | { type: "open"; directory: string }
   | { type: "validate"; directory: string; file: string }
   | { type: "validate-public"; directory: string }
@@ -35,6 +36,7 @@ export type ClientRequest =
 export type ServerMessage =
   | { type: "status"; git_available: boolean; node_available: boolean; cliAvailable: boolean; message?: string }
   | { type: "auth"; configured: boolean; connected: boolean }
+  | { type: "sync"; revision: number; mode: "fenced" | "legacy"; action: "created" | "updated" }
   | { type: "courses"; entries: LocalCheckout[] }
   | { type: "validation"; result: LocalDiagnostic }
   | { type: "material"; name: string; content: string }
@@ -45,7 +47,8 @@ export function isClientRequest(value: unknown): value is ClientRequest {
   if (!value || typeof value !== "object") return false;
   const input = value as Record<string, unknown>;
   if (input.type === "doctor" || input.type === "list" || input.type === "auth-status" ||
-      input.type === "sign-in" || input.type === "sign-out" || input.type === "checkout-remote") return true;
+      input.type === "sign-in" || input.type === "sign-out" || input.type === "checkout-remote" ||
+      input.type === "sync-active") return true;
   if (input.type === "open") return typeof input.directory === "string" && input.directory.length > 0;
   if (input.type === "validate-public") return typeof input.directory === "string" && input.directory.length > 0;
   if (input.type === "list-examples") return typeof input.directory === "string" && input.directory.length > 0;

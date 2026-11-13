@@ -8,6 +8,8 @@ import type { ClientRequest, LocalCheckout, LocalDiagnostic, ServerMessage } fro
 import { isClientRequest } from "./shared/protocol";
 import { listLocalExamples, readLessonMaterial } from "./shared/materials";
 import { AuthSession } from "./shared/auth";
+import { SandboxHttpSync } from "./shared/sandbox";
+import { checkoutFileForSync } from "./shared/workspace";
 
 type SensitiveSetting = "apiBaseUrl" | "cliPath" | "workspaceRoot";
 
@@ -180,6 +182,31 @@ class SidebarProvider implements vscode.WebviewViewProvider {
           await this.handle({ type: "list" });
           break;
         }
+        case "sync-active": {
+          if (!apiBaseURL()) throw new Error("Настрой HTTPS адрес Codechuman Gateway.");
+          const editor = vscode.window.activeTextEditor;
+          if (!editor || editor.document.uri.scheme !== "file") {
+            throw new Error("Открой исходный файл скачанного задания в редакторе VS Code.");
+          }
+          const binding = checkoutFileForSync(localRoot(), editor.document.uri.fsPath);
+          const token = await this.auth().getAccessToken();
+          if (!token) throw new Error("Сначала войди в аккаунт Codechuman.");
+          // Explicit action: sends the editor's current buffer, including unsaved
+          // changes. No file watching, implicit Git commit, or hidden AI call.
+          const result = await new SandboxHttpSync(apiBaseURL()).syncFile({
+            sandboxId: binding.sandboxId,
+            relativePath: binding.relativePath,
+            content: editor.document.getText(),
+            token,
+          });
+          this.send({ type: "sync", revision: result.workspaceRevision,
+            mode: result.mode, action: result.action });
+          void vscode.window.showInformationMessage(
+            `Sandbox подтвердил ${binding.relativePath} (ревизия ${result.workspaceRevision}).` +
+            (result.mode === "legacy" ? " Внимание: прежний режим Sandbox без CAS fence." : ""),
+          );
+          break;
+        }
         case "doctor": {
           const result = await cli(["doctor"]) as { git_available: boolean; node_available: boolean };
           this.send({ type: "status", cliAvailable: true, git_available: !!result.git_available, node_available: !!result.node_available });
@@ -226,7 +253,7 @@ class SidebarProvider implements vscode.WebviewViewProvider {
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       this.send({ type: "error", message: detail });
-      if (!this.view) void vscode.window.showErrorMessage(detail);
+      if (!this.view || message.type === "sync-active") void vscode.window.showErrorMessage(detail);
       if (message.type === "doctor") {
         this.send({ type: "status", cliAvailable: false, git_available: false, node_available: false,
           message: "Установи codechuman-cli из GitHub Releases и настрой путь в Codechuman Settings." });
@@ -266,6 +293,7 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(vscode.commands.registerCommand("codechuman.signIn", () => sidebar.run({ type: "sign-in" })));
   context.subscriptions.push(vscode.commands.registerCommand("codechuman.signOut", () => sidebar.run({ type: "sign-out" })));
   context.subscriptions.push(vscode.commands.registerCommand("codechuman.checkoutRemote", () => sidebar.run({ type: "checkout-remote" })));
+  context.subscriptions.push(vscode.commands.registerCommand("codechuman.syncActive", () => sidebar.run({ type: "sync-active" })));
 }
 
 export function deactivate(): void {}
