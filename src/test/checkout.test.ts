@@ -14,7 +14,9 @@ describe("Codechuman CLI remote checkout arguments", () => {
 
   it("rejects malformed task identity and non-HTTPS endpoint before spawning the CLI", () => {
     expect(checkoutRemoteArgs("https://learn.example.org/", taskID, "/tmp/cache")[2])
-      .toBe("https://learn.example.org/");
+      .toBe("https://learn.example.org");
+    expect(checkoutRemoteArgs("https://learn.example.org:443", taskID, "/tmp/cache")[2])
+      .toBe("https://learn.example.org");
     expect(() => checkoutRemoteArgs("https://learn.example.org", "../malicious", "/tmp/cache")).toThrow();
     expect(() => checkoutRemoteArgs("http://learn.example.org", taskID, "/tmp/cache")).toThrow();
     expect(() => checkoutRemoteArgs("https://student:secret@learn.example.org", taskID, "/tmp/cache")).toThrow();

@@ -13,10 +13,9 @@ export function checkoutRemoteArgs(origin: string, taskInstanceID: string, works
     throw new Error("Укажи HTTPS origin Codechuman Gateway.");
   }
   if (url.protocol !== "https:" || !url.hostname || url.username || url.password ||
-      url.search || url.hash || url.pathname !== "/" ||
-      (url.origin !== origin && url.origin + "/" !== origin)) {
+      url.search || url.hash || url.pathname !== "/") {
     throw new Error("Codechuman Gateway должен быть HTTPS origin без пути и учётных данных.");
   }
-  return ["checkout-remote", "--api-base", origin, "--task-instance", taskInstanceID,
+  return ["checkout-remote", "--api-base", url.origin, "--task-instance", taskInstanceID,
     "--root", workspaceRoot, "--token-stdin"];
 }
