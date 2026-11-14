@@ -60,6 +60,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run --config vitest.config.ts",
+    "test:extension": "npm run build && node scripts/extension-smoke.mjs",
+    "test:extension:syntax": "node --check scripts/extension-smoke.mjs && node --check test/extension-host/smoke.cjs",
     "build:extension": "esbuild src/extension.ts --bundle --platform=node --format=cjs --target=node20 --external:vscode --outfile=dist/extension.js",
     "build:webview": "vite build",
     "build": "npm run typecheck && npm run build:extension && npm run build:webview",
@@ -74,6 +76,7 @@
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@types/vscode": "^1.98.0",
+    "@vscode/test-electron": "2.5.2",
     "@vscode/vsce": "^3.5.0",
     "esbuild": "^0.25.0",
     "typescript": "^5.9.0",

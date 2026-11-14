@@ -65,12 +65,21 @@ npm ci
 npm test
 npm run typecheck
 npm run package:vsix
+npm run test:extension
 ```
 
 The generated `codechuman-vscode-*.vsix` can be installed with **Extensions →
 Install from VSIX**. A Marketplace account is not required. The user must
 separately install the development version of `codechuman-cli`, until the release
 packaging step adds a verified binary installer.
+
+The optional `test:extension` command uses the official VS Code extension-host
+test runner, downloads a test VS Code build if necessary, and checks activation,
+the contributed commands, and opening the React sidebar. It requires a working
+GUI session; on headless Linux use `xvfb-run -a npm run test:extension`
+after installing Xvfb. To reuse an installed VS Code executable, set
+`CODECHUMAN_VSCODE_BIN` to its full path. The smoke does **not** authenticate
+with Gateway, download a TaskInstance, sync files or call AI services.
 
 ## Sign-in and preview remote checkout
 
