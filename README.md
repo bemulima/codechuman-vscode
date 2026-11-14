@@ -45,8 +45,8 @@ Early, **partial** implementation of [Codechuman IDE #28](https://github.com/bem
   cannot redirect credentials or override the executable.
 
 **Not yet implemented:** Browser/OAuth-only account pairing, Course/Student
-lesson selection, the *server-side* Sandbox Git HTTPS export (preview checkout
-currently receives HTTP 404 until deployed), cross-device reconciliation,
+lesson selection, deployment/activation of the merged server-side Git HTTPS
+export routes in a student environment, cross-device reconciliation,
 conflict-free legacy auto-sync, teacher chat via
 Dialog/AI Prompt, official Practice Submit, and the complete acceptance suite.
 The teacher view explicitly labels missing integration instead of inventing
@@ -65,12 +65,21 @@ npm ci
 npm test
 npm run typecheck
 npm run package:vsix
+npm run test:extension
 ```
 
 The generated `codechuman-vscode-*.vsix` can be installed with **Extensions →
 Install from VSIX**. A Marketplace account is not required. The user must
 separately install the development version of `codechuman-cli`, until the release
 packaging step adds a verified binary installer.
+
+The optional `test:extension` command uses the official VS Code extension-host
+test runner, downloads a test VS Code build if necessary, and checks activation,
+the contributed commands, and opening the React sidebar. It requires a working
+GUI session; on headless Linux use `xvfb-run -a npm run test:extension`
+after installing Xvfb. To reuse an installed VS Code executable, set
+`CODECHUMAN_VSCODE_BIN` to its full path. The smoke does **not** authenticate
+with Gateway, download a TaskInstance, sync files or call AI services.
 
 ## Sign-in and preview remote checkout
 
@@ -81,11 +90,17 @@ packaging step adds a verified binary installer.
 2. Run **Codechuman: Sign In** in the Command Palette, or open the sidebar and
    choose **Sign in**. The extension prompts for the account's email/password
    using VS Code native input dialogs; nothing is typed into the webview.
-3. Once the server implements `POST /api/v1/ide/checkouts` and task-scoped
-   Git HTTPS export, use **Codechuman: Checkout TaskInstance (Preview)** with
-   the UUID of an already started practice task. It will call the CLI, clone
-   immutable starter files, and keep cached lesson materials in the configurable
-   `~/.codechuman` workspace. This is not yet end-to-end operational.
+3. Install a Codechuman CLI build that includes the corrected descriptor v1
+   contract (`codechuman-cli` PR #3 or its later accepted release). The
+   `POST /api/v1/ide/checkouts` resolver and task-scoped HTTPS Git export are
+   implemented in the merged backend, but still require deployment and enabled
+   feature flags. Use **Codechuman: Checkout TaskInstance (Preview)** with the
+   UUID of an already started practice task. This invokes the CLI with a token
+   sent via stdin, downloads the pinned Git starter into `~/.codechuman`, and
+   does not overwrite an existing checkout. **It does not download lesson,
+   task, quiz or example materials**: those still require separately authorized
+   Course endpoints. An installed VS Code extension has not yet passed its own
+   live Auth/Gateway checkout acceptance.
 4. Open a cached task's source file, edit it, and choose **Codechuman: Sync
    Active File to Sandbox (Manual)**. This sends the **current editor buffer**,
    even if it has not been saved. The request goes directly to the existing

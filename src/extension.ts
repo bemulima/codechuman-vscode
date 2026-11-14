@@ -13,6 +13,7 @@ import { checkoutFileForSync } from "./shared/workspace";
 import { DebouncedSandboxQueue } from "./shared/auto-sync";
 import { localValidationLocations } from "./shared/diagnostics";
 import type { SandboxValidationObservation } from "./shared/sandbox";
+import { checkoutRemoteArgs } from "./shared/checkout";
 
 type SensitiveSetting = "apiBaseUrl" | "cliPath" | "workspaceRoot";
 
@@ -236,8 +237,6 @@ class SidebarProvider implements vscode.WebviewViewProvider {
         }
         case "checkout-remote": {
           if (!apiBaseURL()) throw new Error("Настрой HTTPS адрес Codechuman Gateway.");
-          const token = await this.auth().getAccessToken();
-          if (!token) throw new Error("Сначала войди в аккаунт Codechuman.");
           const taskID = await vscode.window.showInputBox({
             title: "Скачать Codechuman TaskInstance", prompt: "UUID уже запущенной задачи",
             ignoreFocusOut: true,
@@ -245,8 +244,9 @@ class SidebarProvider implements vscode.WebviewViewProvider {
               ? null : "Нужен UUID TaskInstance.",
           });
           if (taskID === undefined) break;
-          await cli(["checkout-remote", "--api-base", apiBaseURL(), "--task-instance", taskID,
-            "--root", localRoot(), "--token-stdin"], { stdin: token, timeoutMs: 150000 });
+          const token = await this.auth().getAccessToken();
+          if (!token) throw new Error("Сначала войди в аккаунт Codechuman.");
+          await cli(checkoutRemoteArgs(apiBaseURL(), taskID, localRoot()), { stdin: token, timeoutMs: 150000 });
           void vscode.window.showInformationMessage("Задание Codechuman загружено в локальный каталог.");
           await this.handle({ type: "list" });
           break;
