@@ -14,6 +14,7 @@ import { DebouncedSandboxQueue } from "./shared/auto-sync";
 import { localValidationLocations } from "./shared/diagnostics";
 import type { SandboxValidationObservation } from "./shared/sandbox";
 import { checkoutRemoteArgs } from "./shared/checkout";
+import { chooseCheckoutSourceFile, listCheckoutSourceFiles, verifyCheckoutSourceFile } from "./shared/open";
 
 type SensitiveSetting = "apiBaseUrl" | "cliPath" | "workspaceRoot";
 
@@ -354,7 +355,17 @@ class SidebarProvider implements vscode.WebviewViewProvider {
           const directory = checkedDirectory(message.directory);
           // Keep the user's current workspace intact; replacing it would
           // interrupt edits and reload the Codechuman sidebar.
-          const source = vscode.Uri.file(path.join(directory, "app.js"));
+          const files = listCheckoutSourceFiles(localRoot(), directory);
+          const selected = await chooseCheckoutSourceFile(files, async (options) => {
+            const choice = await vscode.window.showQuickPick(
+              options.map((file) => ({ label: file.label, description: "Исходный файл задания", file })),
+              { title: "Открыть файл задания", placeHolder: "Выберите исходный файл" },
+            );
+            return choice?.file.absolutePath;
+          });
+          if (!selected) break;
+          const sourcePath = verifyCheckoutSourceFile(localRoot(), directory, selected.absolutePath);
+          const source = vscode.Uri.file(sourcePath);
           const document = await vscode.workspace.openTextDocument(source);
           await vscode.window.showTextDocument(document, { preview: false });
           break;
