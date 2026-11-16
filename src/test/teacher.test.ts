@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {taskCLIArgs,teacherInput,parseTeacherReply,parseCodeCheck,parseSubmitReply} from '../shared/teacher';
+import {taskCLIArgs,teacherInput,parseTeacherReply,parseCodeCheck,parseSubmitReply,OfficialSubmitRecovery} from '../shared/teacher';
 import {isClientRequest} from '../shared/protocol';
 const task='22222222-2222-4222-8222-222222222222',id='11111111-1111-4111-8111-111111111111';
 describe('Teacher and Sandbox CLI boundary',()=>{
@@ -33,4 +33,12 @@ describe('Teacher and Sandbox CLI boundary',()=>{
 
 describe('official Submit is a separate server authority',()=>{
  it('preserves an unconfirmed key instead of inventing success',()=>{const value={task_instance_id:task,idempotency_key:id,scope:'MILESTONE',milestone_id:id,uncertain:true,token:'secret'};expect(parseSubmitReply(value,task,id).uncertain).toBe(true);expect(JSON.stringify(parseSubmitReply(value,task,id))).not.toContain('secret');expect(()=>parseSubmitReply({...value,uncertain:false},task,id)).toThrow();expect(isClientRequest({type:'official-submit',directory:'/task',scope:'MILESTONE'})).toBe(true);expect(isClientRequest({type:'official-submit',directory:'/task',scope:'FREE_PASS'})).toBe(false);});
+});
+
+it('blocks unknown process recovery and binds confirmed replay to the original task and origin',()=>{
+ const recovery=new OfficialSubmitRecovery();const planned=recovery.plan('/task',task,'https://example.org','FINAL',id);expect(planned.replay).toBe(false);
+ expect(()=>recovery.plan('/task',task,'https://example.org','FINAL',task)).toThrow();
+ const ack={task_instance_id:task,idempotency_key:id,scope:'FINAL',uncertain:true};recovery.accept('/task',task,'https://example.org',id,ack);
+ expect(recovery.plan('/task',task,'https://example.org','MILESTONE',task)).toEqual({...planned,replay:true});
+ expect(()=>recovery.plan('/task',task,'https://other.example.org','FINAL',task)).toThrow();expect(()=>recovery.plan('/task',id,'https://example.org','FINAL',task)).toThrow();
 });

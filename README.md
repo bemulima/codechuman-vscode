@@ -146,3 +146,9 @@ In AI Teacher choose a downloaded task, load canonical Dialog history, or Run/Ch
 Commands: Codechuman Refresh Teacher History, Ask Teacher About Saved Code, Run/Check Saved main.go in Sandbox. Use trusted user-level Gateway/CLI/root settings; workspace overrides remain rejected. No Marketplace publication or server feature activation occurs.
 
 Official Submit is separate from Run/Check: choose milestone or final and confirm the native modal dialog. It uses the frozen Practice V2 command and server-derived current milestone. Unconfirmed/VALIDATING receipts retain the original scope/key for replay; no new idempotency key or source upload is invented for that replay. A transport timeout never means success. Practice/Sandbox own the frozen snapshot and Student remains the progress authority.
+
+Official Submit recovery keeps its original key in memory. A process failure
+without a valid CLI receipt blocks replay; inspect official history first. A
+valid uncertain receipt permits same-key recovery without re-uploading code.
+Pending requests are bound to the original TaskInstance and Gateway origin.
+Signing out deletes credentials while retaining these non-secret request keys.

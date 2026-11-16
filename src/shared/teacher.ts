@@ -33,3 +33,23 @@ export function parseSubmitReply(value:unknown,task:string,key:string):SubmitRep
  if(v.submission){const s=v.submission;if(v.uncertain||s.schema!=='practice-task-submission.v2'||!uuid.test(s.id)||!uuid.test(s.student_id)||s.task_instance_id!==task||s.scope!==v.scope||s.milestone_id!==v.milestone_id||!/^sha256:[0-9a-f]{64}$/.test(s.workspace_digest)||!/^[A-Z][A-Z_]{0,31}$/.test(s.status))throw new Error('Неподтверждённая официальная квитанция.');out.submission={schema:s.schema,id:s.id,student_id:s.student_id,task_instance_id:s.task_instance_id,scope:s.scope,milestone_id:s.milestone_id,workspace_digest:s.workspace_digest,status:s.status};}
  else if(!v.uncertain)throw new Error('Отсутствует официальная квитанция.');return out;
 }
+
+// A process failure is not a durable upload/Submit receipt. Keep its original
+// key, but never turn an unknown first attempt into a replay against old code.
+export class OfficialSubmitRecovery {
+ private readonly pending=new Map<string,{origin:string;task:string;result:SubmitReply;confirmed:boolean}>();
+ plan(directory:string,task:string,origin:string,scope:'MILESTONE'|'FINAL',key:string):{scope:'MILESTONE'|'FINAL';idempotency_key:string;milestone_id?:string;replay:boolean}{
+  const normalized=new URL(origin).origin,previous=this.pending.get(directory);
+  if(previous&&(previous.origin!==normalized||previous.task!==task||!previous.confirmed))throw new Error('Предыдущая отправка не подтверждена для этого задания и Gateway. Проверьте официальную историю; исходный ключ сохранён.');
+  const result=previous?.result??{task_instance_id:task,idempotency_key:key,scope,uncertain:true};
+  if(!previous)this.pending.set(directory,{origin:normalized,task,result,confirmed:false});
+  return {scope:result.scope,idempotency_key:result.idempotency_key,milestone_id:result.milestone_id,replay:!!previous};
+ }
+ accept(directory:string,task:string,origin:string,key:string,value:unknown):SubmitReply{
+  const previous=this.pending.get(directory);
+  if(!previous||previous.task!==task||previous.origin!==new URL(origin).origin||previous.result.idempotency_key!==key)throw new Error('Контекст официальной отправки изменился.');
+  const result=parseSubmitReply(value,task,key);
+  if(result.uncertain||result.submission?.status==='VALIDATING')this.pending.set(directory,{...previous,result,confirmed:true});else this.pending.delete(directory);
+  return result;
+ }
+}

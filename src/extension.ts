@@ -4,7 +4,7 @@ import { readFileSync, realpathSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
-import { taskCLIArgs,teacherInput,parseTeacherReply,parseCodeCheck,parseSubmitReply, type SubmitReply } from "./shared/teacher";
+import { taskCLIArgs,teacherInput,parseTeacherReply,parseCodeCheck,OfficialSubmitRecovery } from "./shared/teacher";
 import type { ClientRequest, LocalCheckout, LocalDiagnostic, ServerMessage } from "./shared/protocol";
 import { isClientRequest } from "./shared/protocol";
 import { listLocalExamples, readLessonMaterial } from "./shared/materials";
@@ -93,7 +93,7 @@ class SidebarProvider implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
   private readonly taskBusy=new Set<string>();
   private authGeneration=0;
-  private readonly pendingSubmits=new Map<string,SubmitReply>();
+  private readonly submitRecovery=new OfficialSubmitRecovery();
   private readonly authSessions = new Map<string, AuthSession>();
   private readonly autoSyncTasks = new Map<string, DebouncedSandboxQueue>();
   private readonly acknowledgedFences = new Map<string, { origin: string; epoch: number }>();
@@ -247,7 +247,6 @@ class SidebarProvider implements vscode.WebviewViewProvider {
         }
         case "sign-out": {
           this.authGeneration++;
-          this.pendingSubmits.clear();
           this.disableAutoSync();
           this.acknowledgedFences.clear();
           this.diagnostics.clear();
@@ -296,17 +295,14 @@ class SidebarProvider implements vscode.WebviewViewProvider {
           try {
             const token=await this.auth().getAccessToken();if(!token)throw new Error('Сначала войдите в аккаунт Codechuman.');
             const command=message.type==='official-submit'?'submit-solution':message.type==='sandbox-check'?'check-solution':'teacher-chat';
-            const prior=this.pendingSubmits.get(directory);
-            const official=message.type==='official-submit'?JSON.stringify({token,scope:prior?.scope??message.scope,idempotency_key:prior?.idempotency_key??crypto.randomUUID(),milestone_id:prior?.milestone_id,replay:!!prior}):null;
-            if(official){const planned=JSON.parse(official) as {idempotency_key:string;scope:'MILESTONE'|'FINAL';milestone_id?:string};this.pendingSubmits.set(directory,{task_instance_id:manifest.task_instance_id,idempotency_key:planned.idempotency_key,scope:planned.scope,milestone_id:planned.milestone_id,uncertain:true});}
+            const official=message.type==='official-submit'?JSON.stringify({token,...this.submitRecovery.plan(directory,manifest.task_instance_id,origin,message.scope,crypto.randomUUID())}):null;
             const input=official??(send?teacherInput(token,message.body):JSON.stringify({token,body:'',sync_main:false}));
             if(generation!==this.authGeneration||origin!==apiBaseURL())throw new Error('Сессия изменилась; запрос отменён.');
             const result=await cli(taskCLIArgs(command,origin,directory),{stdin:input,timeoutMs:135000});
             if(generation!==this.authGeneration||origin!==apiBaseURL())break;
             if(command==='submit-solution'){
               const key=(JSON.parse(input) as {idempotency_key:string}).idempotency_key;
-              const receipt=parseSubmitReply(result,manifest.task_instance_id,key);
-              if(receipt.uncertain||receipt.submission?.status==='VALIDATING')this.pendingSubmits.set(directory,receipt);else this.pendingSubmits.delete(directory);
+              const receipt=this.submitRecovery.accept(directory,manifest.task_instance_id,origin,key,result);
               this.send({type:'official-receipt',directory,result:receipt});
             }
             else if(command==='check-solution')this.send({type:'code-check',directory,result:parseCodeCheck(result,manifest.task_instance_id)});
