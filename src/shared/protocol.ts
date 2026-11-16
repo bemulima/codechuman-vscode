@@ -20,6 +20,7 @@ export interface LocalDiagnostic {
 }
 
 export type ClientRequest =
+  | {type:"official-submit";directory:string;scope:"MILESTONE"|"FINAL"}
   | { type: "teacher-send"; directory: string; body: string }
   | { type: "teacher-refresh"; directory: string }
   | { type: "sandbox-check"; directory: string }
@@ -40,6 +41,7 @@ export type ClientRequest =
   | { type: "list-examples"; directory: string };
 
 export type ServerMessage =
+  | {type:"official-receipt";directory:string;result:import("./teacher").SubmitReply}
   | { type: "task-selected";directory:string }
   | { type: "task-busy"; directory:string; busy:boolean }
   | { type: "teacher"; directory:string; reply:import("./teacher").TeacherReply }
@@ -62,6 +64,7 @@ export function isClientRequest(value: unknown): value is ClientRequest {
       input.type === "sign-in" || input.type === "sign-out" || input.type === "checkout-remote" ||
       input.type === "sync-active" || input.type === "auto-sync-enable" || input.type === "auto-sync-disable" ||
       input.type === "auto-sync-status") return true;
+  if(input.type==='official-submit')return typeof input.directory==='string'&&input.directory.length>0&&(input.scope==='MILESTONE'||input.scope==='FINAL');
   if(input.type==='teacher-send')return typeof input.directory==='string'&&input.directory.length>0&&typeof input.body==='string'&&input.body.trim().length>0&&input.body.length<=12000;
   if(input.type==='teacher-refresh'||input.type==='sandbox-check')return typeof input.directory==='string'&&input.directory.length>0;
   if (input.type === "open") return typeof input.directory === "string" && input.directory.length > 0;

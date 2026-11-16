@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ClientRequest, LocalCheckout, LocalDiagnostic, ServerMessage } from "../../src/shared/protocol";
-import type { TeacherReply,CodeCheckReply } from "../../src/shared/teacher";
+import type { TeacherReply,CodeCheckReply,SubmitReply } from "../../src/shared/teacher";
 import type { SandboxValidationObservation } from "../../src/shared/sandbox";
 
 declare function acquireVsCodeApi(): { postMessage(message: ClientRequest): void };
@@ -25,6 +25,7 @@ export function App() {
   const [material, setMaterial] = useState<{ name: string; content: string } | null>(null);
   const [examples, setExamples] = useState<{ directory: string; names: string[] } | null>(null);
   const [selectedTask,setSelectedTask]=useState('');
+  const [official,setOfficial]=useState<{directory:string;result:SubmitReply}|null>(null);
   const [draft,setDraft]=useState('');
   const [taskBusy,setTaskBusy]=useState<Record<string,boolean>>({});
   const [teacher,setTeacher]=useState<{directory:string;reply:TeacherReply}|null>(null);
@@ -34,7 +35,8 @@ export function App() {
   useEffect(() => {
     const handler = (event: MessageEvent<ServerMessage>) => {
       const payload = event.data;
-      if(payload.type==='task-selected'){setSelectedTask(payload.directory);setTab('teacher');}
+      if(payload.type==='official-receipt')setOfficial({directory:payload.directory,result:payload.result});
+      else if(payload.type==='task-selected'){setSelectedTask(payload.directory);setTab('teacher');}
       else if(payload.type==='task-busy')setTaskBusy(previous=>({...previous,[payload.directory]:payload.busy}));
       else if(payload.type==='teacher')setTeacher({directory:payload.directory,reply:payload.reply});
       else if(payload.type==='code-check')setCheck({directory:payload.directory,result:payload.result});
@@ -45,7 +47,7 @@ export function App() {
       } else if (payload.type === "auth") {
         setAuthConfigured(payload.configured);
         setAuthenticated(payload.connected);
-        if(!payload.connected){setTeacher(null);setCheck(null);setDraft("");}
+        if(!payload.connected){setTeacher(null);setCheck(null);setOfficial(null);setDraft("");}
       } else if (payload.type === "sync") {
         setMessage(`Sandbox подтвердил ${payload.action === "created" ? "создание" : "изменение"} файла, ревизия ${payload.revision}.` +
           (payload.mode === "legacy" ? " Legacy-режим: нет защиты от параллельной записи." : ""));
@@ -202,6 +204,11 @@ export function App() {
             {check.result.issues.map(i=><p key={i.code}><code>{i.code}</code> — {i.message}</p>)}
             <small>Предварительная проверка. ERROR — техническая ошибка; официальный прогресс не меняется.</small>
           </div>}
+          <div className="actions">
+            <button className="secondary" disabled={!authenticated||!selectedTask||taskBusy[selectedTask]} onClick={()=>vscode.postMessage({type:'official-submit',directory:selectedTask,scope:'MILESTONE'})}>Официально отправить шаг</button>
+            <button className="secondary" disabled={!authenticated||!selectedTask||taskBusy[selectedTask]} onClick={()=>vscode.postMessage({type:'official-submit',directory:selectedTask,scope:'FINAL'})}>Официально завершить задание</button>
+          </div>
+          {official?.directory===selectedTask&&<p role="status">Официальная отправка: {official.result.uncertain?'квитанция не подтверждена; повтор использует тот же ключ':official.result.submission?.status}. Решение о прогрессе принимает сервер.</p>}
           <div className="chat-transcript" role="log" aria-label="История Teacher">
             {teacher?.directory===selectedTask&&teacher.reply.messages.map(m=><article key={m.id} className={m.author_type==='personal_teacher'?'chat-teacher':'chat-student'}><strong>{m.author_type==='personal_teacher'?'Teacher':'Вы'}</strong><p>{m.body}</p></article>)}
             {teacher?.directory===selectedTask&&teacher.reply.pending&&<p>Ответ ещё готовится. Обновите историю, не отправляя вопрос повторно.</p>}
