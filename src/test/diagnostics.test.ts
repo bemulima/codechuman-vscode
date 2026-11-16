@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { realpathSync, mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
 import { localValidationLocations } from "../shared/diagnostics";
@@ -9,7 +9,7 @@ afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { force: true
 
 describe("Sandbox diagnostics local source mapping", () => {
   it("maps only verified files inside the exact downloaded lesson", () => {
-    const root = mkdtempSync(path.join(tmpdir(), "ch-ide28-diagnostic-"));
+    const root = realpathSync(mkdtempSync(path.join(tmpdir(), "ch-ide28-diagnostic-")));
     roots.push(root);
     mkdirSync(path.join(root, "src"));
     writeFileSync(path.join(root, "src", "app.js"), "bad");

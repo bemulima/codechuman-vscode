@@ -20,6 +20,9 @@ export interface LocalDiagnostic {
 }
 
 export type ClientRequest =
+  | { type: "teacher-send"; directory: string; body: string }
+  | { type: "teacher-refresh"; directory: string }
+  | { type: "sandbox-check"; directory: string }
   | { type: "doctor" }
   | { type: "list" }
   | { type: "auth-status" }
@@ -37,6 +40,10 @@ export type ClientRequest =
   | { type: "list-examples"; directory: string };
 
 export type ServerMessage =
+  | { type: "task-selected";directory:string }
+  | { type: "task-busy"; directory:string; busy:boolean }
+  | { type: "teacher"; directory:string; reply:import("./teacher").TeacherReply }
+  | { type: "code-check"; directory:string; result:import("./teacher").CodeCheckReply }
   | { type: "status"; git_available: boolean; node_available: boolean; cliAvailable: boolean; message?: string }
   | { type: "auth"; configured: boolean; connected: boolean }
   | { type: "sync"; revision: number; mode: "fenced" | "legacy"; action: "created" | "updated" }
@@ -55,6 +62,8 @@ export function isClientRequest(value: unknown): value is ClientRequest {
       input.type === "sign-in" || input.type === "sign-out" || input.type === "checkout-remote" ||
       input.type === "sync-active" || input.type === "auto-sync-enable" || input.type === "auto-sync-disable" ||
       input.type === "auto-sync-status") return true;
+  if(input.type==='teacher-send')return typeof input.directory==='string'&&input.directory.length>0&&typeof input.body==='string'&&input.body.trim().length>0&&input.body.length<=12000;
+  if(input.type==='teacher-refresh'||input.type==='sandbox-check')return typeof input.directory==='string'&&input.directory.length>0;
   if (input.type === "open") return typeof input.directory === "string" && input.directory.length > 0;
   if (input.type === "validate-public") return typeof input.directory === "string" && input.directory.length > 0;
   if (input.type === "list-examples") return typeof input.directory === "string" && input.directory.length > 0;

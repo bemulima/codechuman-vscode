@@ -4,6 +4,7 @@ import { readFileSync, realpathSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
+import { taskCLIArgs,teacherInput,parseTeacherReply,parseCodeCheck } from "./shared/teacher";
 import type { ClientRequest, LocalCheckout, LocalDiagnostic, ServerMessage } from "./shared/protocol";
 import { isClientRequest } from "./shared/protocol";
 import { listLocalExamples, readLessonMaterial } from "./shared/materials";
@@ -13,7 +14,7 @@ import { checkoutFileForSync } from "./shared/workspace";
 import { DebouncedSandboxQueue } from "./shared/auto-sync";
 import { localValidationLocations } from "./shared/diagnostics";
 import type { SandboxValidationObservation } from "./shared/sandbox";
-import { checkoutRemoteArgs } from "./shared/checkout";
+import { openRemoteArgs } from "./shared/checkout";
 import { chooseCheckoutSourceFile, listCheckoutSourceFiles, verifyCheckoutSourceFile } from "./shared/open";
 
 type SensitiveSetting = "apiBaseUrl" | "cliPath" | "workspaceRoot";
@@ -76,7 +77,7 @@ function cli(args: string[], options: { stdin?: string; timeoutMs?: number } = {
     child.on("close", (code) => {
       clearTimeout(timeout);
       if (code !== 0 || stdout.length > 1024 * 1024) {
-        reject(new Error(`Codechuman CLI завершился с кодом ${code ?? "?"}. ${stderr.slice(0,500)}`));
+        reject(new Error(`Codechuman CLI завершился с кодом ${code ?? "?"}. `));
         return;
       }
       try {
@@ -90,6 +91,8 @@ function cli(args: string[], options: { stdin?: string; timeoutMs?: number } = {
 
 class SidebarProvider implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
+  private readonly taskBusy=new Set<string>();
+  private authGeneration=0;
   private readonly authSessions = new Map<string, AuthSession>();
   private readonly autoSyncTasks = new Map<string, DebouncedSandboxQueue>();
   private readonly acknowledgedFences = new Map<string, { origin: string; epoch: number }>();
@@ -142,6 +145,20 @@ class SidebarProvider implements vscode.WebviewViewProvider {
     return this.handle(message);
   }
 
+  async activeTaskAction(action:'teacher-refresh'|'teacher-send'|'sandbox-check'):Promise<void>{
+    const editor=vscode.window.activeTextEditor;
+    if(!editor||editor.document.uri.scheme!=='file'){void vscode.window.showErrorMessage('Откройте файл задания.');return;}
+    try{
+      const binding=checkoutFileForSync(localRoot(),editor.document.uri.fsPath);
+      await vscode.commands.executeCommand('workbench.view.extension.codechuman');
+      this.send({type:'task-selected',directory:binding.checkoutDirectory});
+      if(action==='teacher-send'){
+        const body=await vscode.window.showInputBox({title:'Вопрос Teacher',prompt:'Сохраните main.go перед вопросом',ignoreFocusOut:true});
+        if(!body?.trim())return;await this.run({type:action,directory:binding.checkoutDirectory,body});
+      }else await this.run({type:action,directory:binding.checkoutDirectory});
+      await vscode.commands.executeCommand('workbench.view.extension.codechuman');
+    }catch{void vscode.window.showErrorMessage('Выберите файл внутри скачанного задания Codechuman.');}
+  }
   private send(message: ServerMessage): void {
     void this.view?.webview.postMessage(message);
   }
@@ -228,6 +245,7 @@ class SidebarProvider implements vscode.WebviewViewProvider {
           break;
         }
         case "sign-out": {
+          this.authGeneration++;
           this.disableAutoSync();
           this.acknowledgedFences.clear();
           this.diagnostics.clear();
@@ -247,9 +265,35 @@ class SidebarProvider implements vscode.WebviewViewProvider {
           if (taskID === undefined) break;
           const token = await this.auth().getAccessToken();
           if (!token) throw new Error("Сначала войди в аккаунт Codechuman.");
-          await cli(checkoutRemoteArgs(apiBaseURL(), taskID, localRoot()), { stdin: token, timeoutMs: 150000 });
+          await cli(openRemoteArgs(apiBaseURL(), taskID, localRoot()), { stdin: token, timeoutMs: 150000 });
           void vscode.window.showInformationMessage("Задание Codechuman загружено в локальный каталог.");
           await this.handle({ type: "list" });
+          break;
+        }
+        case "teacher-send":
+        case "teacher-refresh":
+        case "sandbox-check": {
+          const directory=checkedDirectory(message.directory);
+          if(this.taskBusy.has(directory))throw new Error('Дождитесь предыдущего запроса задания.');
+          const origin=apiBaseURL(),generation=this.authGeneration;
+          if(!vscode.workspace.isTrusted)throw new Error('Разрешите выполнение только для доверенного задания.');
+          const manifest=JSON.parse(readFileSync(path.join(directory,'.learning','manifest.json'),'utf8')) as {task_instance_id:string};
+          if(!/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(manifest.task_instance_id))throw new Error('Некорректное задание.');
+          const send=message.type==='teacher-send';
+          if(message.type!=='teacher-refresh') {
+            if([...this.autoSyncTasks.keys()].length)throw new Error('Сначала выключите автосинхронизацию перед Run/Teacher.');
+            for(const doc of vscode.workspace.textDocuments)if(doc.uri.scheme==='file'&&doc.uri.fsPath===path.join(directory,'main.go')&&doc.isDirty)throw new Error('Сначала сохраните main.go.');
+          }
+          this.taskBusy.add(directory);this.send({type:'task-busy',directory,busy:true});
+          try {
+            const token=await this.auth().getAccessToken();if(!token)throw new Error('Сначала войдите в аккаунт Codechuman.');
+            const command=message.type==='sandbox-check'?'check-solution':'teacher-chat';
+            const input=send?teacherInput(token,message.body):JSON.stringify({token,body:'',sync_main:false});
+            const result=await cli(taskCLIArgs(command,origin,directory),{stdin:input,timeoutMs:135000});
+            if(generation!==this.authGeneration||origin!==apiBaseURL())break;
+            if(command==='check-solution')this.send({type:'code-check',directory,result:parseCodeCheck(result,manifest.task_instance_id)});
+            else this.send({type:'teacher',directory,reply:parseTeacherReply(result,manifest.task_instance_id)});
+          } finally {this.taskBusy.delete(directory);this.send({type:'task-busy',directory,busy:false});}
           break;
         }
         case "sync-active": {
@@ -442,6 +486,9 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(vscode.commands.registerCommand("codechuman.syncActive", () => sidebar.run({ type: "sync-active" })));
   context.subscriptions.push(vscode.commands.registerCommand("codechuman.autoSyncEnable", () => sidebar.run({ type: "auto-sync-enable" })));
   context.subscriptions.push(vscode.commands.registerCommand("codechuman.autoSyncDisable", () => sidebar.run({ type: "auto-sync-disable" })));
+  context.subscriptions.push(vscode.commands.registerCommand('codechuman.teacherHistory',()=>sidebar.activeTaskAction('teacher-refresh')));
+  context.subscriptions.push(vscode.commands.registerCommand('codechuman.askTeacher',()=>sidebar.activeTaskAction('teacher-send')));
+  context.subscriptions.push(vscode.commands.registerCommand('codechuman.checkSaved',()=>sidebar.activeTaskAction('sandbox-check')));
   context.subscriptions.push(vscode.workspace.onDidChangeTextDocument((event) => {
     if (event.contentChanges.length > 0) sidebar.onDocumentChanged(event.document);
   }));

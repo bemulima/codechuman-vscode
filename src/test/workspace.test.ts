@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync, rmSync } from "node:fs";
+import { realpathSync, mkdtempSync, mkdirSync, writeFileSync, symlinkSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
 import { checkoutFileForSync } from "../shared/workspace";
@@ -8,7 +8,7 @@ const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 
 function sample() {
-  const root = mkdtempSync(path.join(tmpdir(), "ch-ide28-ws-"));
+  const root = realpathSync(mkdtempSync(path.join(tmpdir(), "ch-ide28-ws-")));
   roots.push(root);
   const lesson = path.join(root, "js-beginner", "01");
   mkdirSync(path.join(lesson, ".learning"), { recursive: true });

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ClientRequest, LocalCheckout, LocalDiagnostic, ServerMessage } from "../../src/shared/protocol";
+import type { TeacherReply,CodeCheckReply } from "../../src/shared/teacher";
 import type { SandboxValidationObservation } from "../../src/shared/sandbox";
 
 declare function acquireVsCodeApi(): { postMessage(message: ClientRequest): void };
@@ -23,18 +24,28 @@ export function App() {
   } | null>(null);
   const [material, setMaterial] = useState<{ name: string; content: string } | null>(null);
   const [examples, setExamples] = useState<{ directory: string; names: string[] } | null>(null);
+  const [selectedTask,setSelectedTask]=useState('');
+  const [draft,setDraft]=useState('');
+  const [taskBusy,setTaskBusy]=useState<Record<string,boolean>>({});
+  const [teacher,setTeacher]=useState<{directory:string;reply:TeacherReply}|null>(null);
+  const [check,setCheck]=useState<{directory:string;result:CodeCheckReply}|null>(null);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
     const handler = (event: MessageEvent<ServerMessage>) => {
       const payload = event.data;
-      if (payload.type === "status") {
+      if(payload.type==='task-selected'){setSelectedTask(payload.directory);setTab('teacher');}
+      else if(payload.type==='task-busy')setTaskBusy(previous=>({...previous,[payload.directory]:payload.busy}));
+      else if(payload.type==='teacher')setTeacher({directory:payload.directory,reply:payload.reply});
+      else if(payload.type==='code-check')setCheck({directory:payload.directory,result:payload.result});
+      else if (payload.type === "status") {
         setCliReady(payload.cliAvailable);
         setGitReady(payload.git_available);
         if (payload.message) setMessage(payload.message);
       } else if (payload.type === "auth") {
         setAuthConfigured(payload.configured);
         setAuthenticated(payload.connected);
+        if(!payload.connected){setTeacher(null);setCheck(null);setDraft("");}
       } else if (payload.type === "sync") {
         setMessage(`Sandbox подтвердил ${payload.action === "created" ? "создание" : "изменение"} файла, ревизия ${payload.revision}.` +
           (payload.mode === "legacy" ? " Legacy-режим: нет защиты от параллельной записи." : ""));
@@ -93,7 +104,7 @@ export function App() {
             <button disabled={!authConfigured} onClick={() => vscode.postMessage({ type: "sign-in" })}>Войти</button>
           )}
         </div>
-        {authenticated && <small>Скачивание требует нового Git HTTPS endpoint. Отправка текущего файла использует существующий Sandbox REST; это ручная операция.</small>}
+        {authenticated && <small>Скачивание получает закреплённые материалы и starter. Сохранённый main.go можно проверить в Sandbox и обсудить с Teacher.</small>}
         {authenticated && <small>Автосинхронизация включается отдельно для каждого открытого задания, отправляет изменения через 1 секунду и требует atomic fence. Активных заданий: {autoSyncTasks}.{autoSyncHalted ? " Конфликт: отправка остановлена." : ""}</small>}
       </div>
       <nav>
@@ -174,10 +185,31 @@ export function App() {
         </section>
       ) : (
         <section className="teacher">
-          <div className="teacher-symbol">✳</div>
-          <h2>Персональный AI Teacher</h2>
-          <p>Диалог подключается к существующим Teacher Agent и Dialog. История и правила обучения останутся на сервере Codechuman.</p>
-          <div className="notice">Серверная авторизация и диалог входят в следующий этап интеграции.</div>
+          <h2>Teacher · текущее задание</h2>
+          <label>Задание
+            <select aria-label="Задание Teacher" value={selectedTask} onChange={e=>{setSelectedTask(e.target.value);setDraft('');}}>
+              <option value="">Выберите скачанное задание</option>
+              {entries.map(entry=><option key={entry.directory} value={entry.directory}>{entry.manifest.course_slug} / {entry.manifest.lesson_number}</option>)}
+            </select>
+          </label>
+          <p className="muted">Сначала сохраните main.go. Teacher увидит сохранённый код и соответствующий результат Sandbox. Проверка сама не вызывает AI.</p>
+          <div className="actions">
+            <button disabled={!authenticated||!selectedTask||taskBusy[selectedTask]} onClick={()=>vscode.postMessage({type:'teacher-refresh',directory:selectedTask})}>Загрузить историю</button>
+            <button disabled={!authenticated||!selectedTask||taskBusy[selectedTask]} onClick={()=>vscode.postMessage({type:'sandbox-check',directory:selectedTask})}>Run / Check</button>
+          </div>
+          {taskBusy[selectedTask]&&<p role="status">Запрос выполняется…</p>}
+          {check?.directory===selectedTask&&<div className="diagnostic"><strong>Sandbox: {check.result.outcome}{check.result.stale?' · УСТАРЕЛ':''}</strong>
+            {check.result.issues.map(i=><p key={i.code}><code>{i.code}</code> — {i.message}</p>)}
+            <small>Предварительная проверка. ERROR — техническая ошибка; официальный прогресс не меняется.</small>
+          </div>}
+          <div className="chat-transcript" role="log" aria-label="История Teacher">
+            {teacher?.directory===selectedTask&&teacher.reply.messages.map(m=><article key={m.id} className={m.author_type==='personal_teacher'?'chat-teacher':'chat-student'}><strong>{m.author_type==='personal_teacher'?'Teacher':'Вы'}</strong><p>{m.body}</p></article>)}
+            {teacher?.directory===selectedTask&&teacher.reply.pending&&<p>Ответ ещё готовится. Обновите историю, не отправляя вопрос повторно.</p>}
+          </div>
+          <form onSubmit={e=>{e.preventDefault();if(draft.trim()&&selectedTask){vscode.postMessage({type:'teacher-send',directory:selectedTask,body:draft});setDraft('');}}}>
+            <textarea aria-label="Вопрос Teacher" placeholder="Задайте вопрос по заданию или результату проверки" value={draft} maxLength={12000} onChange={e=>setDraft(e.target.value)} />
+            <button type="submit" disabled={!authenticated||!selectedTask||!draft.trim()||taskBusy[selectedTask]}>Отправить Teacher</button>
+          </form>
         </section>
       )}
       <footer>Локальные проверки работают без AI. Официальный результат выдаёт сервер.</footer>

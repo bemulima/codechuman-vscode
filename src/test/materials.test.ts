@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { afterEach, describe, expect, it } from "vitest";
 import { lstatSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -43,4 +44,18 @@ describe("local Codechuman materials", () => {
     expect(() => readLessonMaterial(root, "lesson.md")).toThrow();
     expect(lstatSync(join(root, ".learning", "examples", "secret.js")).isSymbolicLink()).toBe(true);
   });
+});
+
+describe('revision-pinned remote materials',()=>{
+ it('opens only the pinned digest-checked public revision offline',()=>{
+  const root=fixture(),rev='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  const learning=join(root,'.learning'),cache=join(learning,'materials',rev);mkdirSync(cache,{recursive:true});
+  const ids={task_instance_id:'22222222-2222-4222-8222-222222222222',course_id:'88888888-8888-4888-8888-888888888888',lesson_id:'99999999-9999-4999-8999-999999999999',lesson_revision:rev};
+  writeFileSync(join(learning,'manifest.json'),JSON.stringify({schema:'codechuman.checkout.v1',...ids}));
+  writeFileSync(join(cache,'lesson.md'),'# pinned');
+  writeFileSync(join(cache,'manifest.json'),JSON.stringify({schema:'codechuman.ide-material-cache.v1',...ids,files:[{path:'lesson.md',sha256:'sha256:'+createHash('sha256').update('# pinned').digest('hex')}]}));
+  expect(readLessonMaterial(root,'lesson.md')).toBe('# pinned');expect(listLocalExamples(root)).toEqual([]);
+  writeFileSync(join(cache,'lesson.md'),'tampered');expect(()=>readLessonMaterial(root,'lesson.md')).toThrow();
+  rmSync(cache,{recursive:true});expect(()=>readLessonMaterial(root,'lesson.md')).toThrow();
+ });
 });

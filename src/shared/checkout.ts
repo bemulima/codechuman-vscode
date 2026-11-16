@@ -19,3 +19,7 @@ export function checkoutRemoteArgs(origin: string, taskInstanceID: string, works
   return ["checkout-remote", "--api-base", url.origin, "--task-instance", taskInstanceID,
     "--root", workspaceRoot, "--token-stdin"];
 }
+
+export function openRemoteArgs(origin:string,task:string,root:string):string[]{
+ const args=checkoutRemoteArgs(origin,task,root);args[0]='open-remote';return args;
+}
