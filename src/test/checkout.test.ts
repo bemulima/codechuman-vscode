@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkoutRemoteArgs } from "../shared/checkout";
+import { checkoutRemoteArgs,openRemoteArgs } from "../shared/checkout";
 
 const taskID = "22222222-2222-4222-8222-222222222222";
 
@@ -23,3 +23,5 @@ describe("Codechuman CLI remote checkout arguments", () => {
     expect(() => checkoutRemoteArgs("https://learn.example.org/api", taskID, "/tmp/cache")).toThrow();
   });
 });
+
+it('remote lesson open fetches the public revision pack through the shared CLI',()=>{expect(openRemoteArgs('https://learn.example.org',taskID,'/tmp/cache')[0]).toBe('open-remote');});

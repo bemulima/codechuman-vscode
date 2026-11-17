@@ -41,3 +41,9 @@ pre { white-space: pre-wrap; font-size: 11px; }
 .teacher { text-align: center; padding-top: 36px; line-height: 1.6; }
 .teacher-symbol { font-size: 42px; color: #4cbf8a; }
 footer { font-size: 11px; line-height: 1.4; margin: 28px 0 16px; border-top: 1px solid var(--vscode-panel-border); padding-top: 12px; }
+
+.teacher select,.teacher textarea {box-sizing:border-box;width:100%;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border);padding:8px;margin:6px 0;}
+.teacher textarea {min-height:90px;resize:vertical;}
+.chat-transcript article {padding:10px;margin:10px 0;border-left:3px solid var(--vscode-focusBorder);background:var(--vscode-editor-background);}
+.chat-transcript p {white-space:pre-wrap;overflow-wrap:anywhere;}
+.chat-student {opacity:.85;}

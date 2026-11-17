@@ -5,32 +5,85 @@
   "version": "0.1.0",
   "publisher": "bemulima",
   "license": "UNLICENSED",
-  "repository": { "type": "git", "url": "https://github.com/bemulima/codechuman-vscode.git" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bemulima/codechuman-vscode.git"
+  },
   "engines": {
     "vscode": "^1.98.0"
   },
-  "categories": ["Education", "Other"],
+  "categories": [
+    "Education",
+    "Other"
+  ],
   "main": "./dist/extension.js",
-  "activationEvents": ["onView:codechuman.sidebar", "onCommand:codechuman.open"],
+  "activationEvents": [
+    "onView:codechuman.sidebar",
+    "onCommand:codechuman.open"
+  ],
   "contributes": {
     "commands": [
-      { "command": "codechuman.open", "title": "Codechuman: Open" },
-      { "command": "codechuman.refresh", "title": "Codechuman: Refresh Local Courses" },
-      { "command": "codechuman.signIn", "title": "Codechuman: Sign In" },
-      { "command": "codechuman.signOut", "title": "Codechuman: Sign Out" },
-      { "command": "codechuman.checkoutRemote", "title": "Codechuman: Checkout TaskInstance (Preview)" },
-      { "command": "codechuman.syncActive", "title": "Codechuman: Sync Active File to Sandbox (Manual)" },
-      { "command": "codechuman.autoSyncEnable", "title": "Codechuman: Enable Auto Sync for Active Task" },
-      { "command": "codechuman.autoSyncDisable", "title": "Codechuman: Disable All Auto Sync" }
+      {
+        "command": "codechuman.open",
+        "title": "Codechuman: Open"
+      },
+      {
+        "command": "codechuman.refresh",
+        "title": "Codechuman: Refresh Local Courses"
+      },
+      {
+        "command": "codechuman.signIn",
+        "title": "Codechuman: Sign In"
+      },
+      {
+        "command": "codechuman.signOut",
+        "title": "Codechuman: Sign Out"
+      },
+      {
+        "command": "codechuman.checkoutRemote",
+        "title": "Codechuman: Checkout TaskInstance (Preview)"
+      },
+      {
+        "command": "codechuman.syncActive",
+        "title": "Codechuman: Sync Active File to Sandbox (Manual)"
+      },
+      {
+        "command": "codechuman.autoSyncEnable",
+        "title": "Codechuman: Enable Auto Sync for Active Task"
+      },
+      {
+        "command": "codechuman.autoSyncDisable",
+        "title": "Codechuman: Disable All Auto Sync"
+      },
+      {
+        "command": "codechuman.teacherHistory",
+        "title": "Codechuman: Refresh Teacher History"
+      },
+      {
+        "command": "codechuman.askTeacher",
+        "title": "Codechuman: Ask Teacher About Saved Code"
+      },
+      {
+        "command": "codechuman.checkSaved",
+        "title": "Codechuman: Run / Check Saved main.go in Sandbox"
+      }
     ],
     "viewsContainers": {
       "activitybar": [
-        { "id": "codechuman", "title": "Codechuman", "icon": "assets/codechuman.svg" }
+        {
+          "id": "codechuman",
+          "title": "Codechuman",
+          "icon": "assets/codechuman.svg"
+        }
       ]
     },
     "views": {
       "codechuman": [
-        { "type": "webview", "id": "codechuman.sidebar", "name": "Learn" }
+        {
+          "type": "webview",
+          "id": "codechuman.sidebar",
+          "name": "Learn"
+        }
       ]
     },
     "configuration": {

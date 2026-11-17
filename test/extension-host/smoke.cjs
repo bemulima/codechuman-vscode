@@ -9,6 +9,9 @@ exports.run = async function run() {
 
   const actual = new Set(await vscode.commands.getCommands(true));
   for (const command of [
+    "codechuman.teacherHistory",
+    "codechuman.askTeacher",
+    "codechuman.checkSaved",
     "codechuman.open",
     "codechuman.refresh",
     "codechuman.signIn",

@@ -136,3 +136,19 @@ teacher continues through Codechuman's own AI Prompt/Dialog services, with
 
 This source currently has no open-source license grant; its public availability
 does not authorize redistribution or relicensing.
+
+## IDE28 pinned materials and Teacher
+
+Checkout now uses CLI `open-remote`: authorized pinned public materials are cached by lesson revision alongside the immutable starter. Local lesson/task/example readers verify identity, paths and SHA256 and work offline; missing/corrupt pinned cache never falls back to old `.learning/lesson.md`. Existing legacy local-only lessons remain readable.
+
+In AI Teacher choose a downloaded task, load canonical Dialog history, or Run/Check saved main.go in the existing Sandbox. Type a question and explicitly Send to Teacher. Save main.go first; unsaved source is rejected for these saved-code operations. Existing manual/auto sync is separate; disable auto-sync before Run/Teacher to avoid concurrent writers. Token stays in SecretStorage and CLI stdin, never webview/argv/URLs/logs. Refresh and Run never call AI; only explicit Send does. PASS/FAIL advisory, ERROR technical, stale requires rerun. Official Submit/progress/mastery remain owned by platform services.
+
+Commands: Codechuman Refresh Teacher History, Ask Teacher About Saved Code, Run/Check Saved main.go in Sandbox. Use trusted user-level Gateway/CLI/root settings; workspace overrides remain rejected. No Marketplace publication or server feature activation occurs.
+
+Official Submit is separate from Run/Check: choose milestone or final and confirm the native modal dialog. It uses the frozen Practice V2 command and server-derived current milestone. Unconfirmed/VALIDATING receipts retain the original scope/key for replay; no new idempotency key or source upload is invented for that replay. A transport timeout never means success. Practice/Sandbox own the frozen snapshot and Student remains the progress authority.
+
+Official Submit recovery keeps its original key in memory. A process failure
+without a valid CLI receipt blocks replay; inspect official history first. A
+valid uncertain receipt permits same-key recovery without re-uploading code.
+Pending requests are bound to the original TaskInstance and Gateway origin.
+Signing out deletes credentials while retaining these non-secret request keys.
